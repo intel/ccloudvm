@@ -78,7 +78,7 @@ type workspace struct {
 	Hostname       string
 	UUID           string
 	PackageUpgrade string
-	ciaoDir        string
+	ccvmDir        string
 	instanceDir    string
 	keyPath        string
 	publicKeyPath  string
@@ -196,12 +196,12 @@ func prepareEnv(ctx context.Context) (*workspace, error) {
 	}
 
 	ws.NoProxy = os.Getenv("no_proxy")
-	ws.ciaoDir = path.Join(ws.Home, ".ciao-down")
-	if _, err := os.Stat(ws.ciaoDir); err != nil {
-		ws.ciaoDir = path.Join(ws.Home, ".ccloudvm")
+	ws.ccvmDir = path.Join(ws.Home, ".ciao-down")
+	if _, err := os.Stat(ws.ccvmDir); err != nil {
+		ws.ccvmDir = path.Join(ws.Home, ".ccloudvm")
 	}
-	ws.instanceDir = path.Join(ws.ciaoDir, "instance")
-	ws.keyPath = path.Join(ws.ciaoDir, "id_rsa")
+	ws.instanceDir = path.Join(ws.ccvmDir, "instance")
+	ws.keyPath = path.Join(ws.ccvmDir, "id_rsa")
 	ws.publicKeyPath = fmt.Sprintf("%s.pub", ws.keyPath)
 
 	data, err = exec.Command("git", "config", "--global", "user.name").Output()

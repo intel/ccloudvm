@@ -122,13 +122,13 @@ func downloadProgress(p progress) {
 	}
 }
 
-func downloadFile(ctx context.Context, URL, ciaoDir string, cb progressCB) (string, error) {
+func downloadFile(ctx context.Context, URL, ccvmDir string, cb progressCB) (string, error) {
 	di, err := makeDownloadInfo(URL)
 	if err != nil {
 		return "", err
 	}
 
-	cacheDir := path.Join(ciaoDir, "cache")
+	cacheDir := path.Join(ccvmDir, "cache")
 	imgPath := path.Join(cacheDir, di.imageName)
 
 	if _, err := os.Stat(imgPath); err == nil {
@@ -144,7 +144,7 @@ func downloadFile(ctx context.Context, URL, ciaoDir string, cb progressCB) (stri
 	// the root of the ~/.ciao_down directory.  We don't want to move the
 	// old image as this would break any existing VMs based off it.
 
-	oldImgPath := path.Join(ciaoDir, di.imageName)
+	oldImgPath := path.Join(ccvmDir, di.imageName)
 	if err := exec.Command("cp", oldImgPath, imgPath).Run(); err == nil {
 		return imgPath, nil
 	}

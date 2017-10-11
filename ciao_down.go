@@ -318,7 +318,7 @@ func create(ctx context.Context, errCh chan error) {
 	}
 
 	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
-	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ciaoDir, downloadProgress)
+	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ccvmDir, downloadProgress)
 	if err != nil {
 		return
 	}
@@ -340,7 +340,7 @@ func create(ctx context.Context, errCh chan error) {
 		return
 	}
 
-	err = manageInstallation(ctx, ws.ciaoDir, ws.instanceDir, ws)
+	err = manageInstallation(ctx, ws.ccvmDir, ws.instanceDir, ws)
 	if err != nil {
 		return
 	}

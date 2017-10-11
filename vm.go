@@ -171,12 +171,12 @@ func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, ss
 	w.Flush()
 }
 
-func serveLocalFile(ctx context.Context, ciaoDir string, w http.ResponseWriter,
+func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
 	r *http.Request) {
 	params := r.URL.Query()
 	URL := params.Get(urlParam)
 
-	path, err := downloadFile(ctx, URL, ciaoDir, func(progress) {})
+	path, err := downloadFile(ctx, URL, ccvmDir, func(progress) {})
 	if err != nil {
 		// May not be the correct error code but the error message is only going
 		// to end up in cloud-init's logs.
@@ -198,7 +198,7 @@ func serveLocalFile(ctx context.Context, ciaoDir string, w http.ResponseWriter,
 	}
 }
 
-func startHTTPServer(ctx context.Context, ciaoDir string, listener net.Listener,
+func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 	errCh chan error) {
 	finished := false
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +222,7 @@ func startHTTPServer(ctx context.Context, ciaoDir string, listener net.Listener,
 	})
 
 	http.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
-		serveLocalFile(ctx, ciaoDir, w, r)
+		serveLocalFile(ctx, ccvmDir, w, r)
 	})
 
 	server := &http.Server{}
@@ -236,7 +236,7 @@ func startHTTPServer(ctx context.Context, ciaoDir string, listener net.Listener,
 	}()
 }
 
-func manageInstallation(ctx context.Context, ciaoDir, instanceDir string, ws *workspace) error {
+func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *workspace) error {
 	socket := path.Join(instanceDir, "socket")
 	disconnectedCh := make(chan struct{})
 
@@ -267,7 +267,7 @@ func manageInstallation(ctx context.Context, ciaoDir, instanceDir string, ws *wo
 	}
 
 	errCh := make(chan error)
-	startHTTPServer(ctx, ciaoDir, listener, errCh)
+	startHTTPServer(ctx, ccvmDir, listener, errCh)
 	select {
 	case <-ctx.Done():
 		_ = listener.Close()

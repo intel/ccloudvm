@@ -66,15 +66,15 @@ const sampleWorkload3Docs = "---\n" + xenialWorkloadSpecNoVM + "...\n---\n" + sa
 const sampleWorkload = "---\n" + xenialWorkloadSpec + "...\n---\n" + sampleCloudInit + "...\n"
 
 func createMockWorkSpaceWithWorkload(t *testing.T, workload string) *workspace {
-	ciaoDir, err := ioutil.TempDir("", "ccloudvm-tests-")
+	ccvmDir, err := ioutil.TempDir("", "ccloudvm-tests-")
 	assert.Nil(t, err)
 
-	instanceDir := path.Join(ciaoDir, "foo")
+	instanceDir := path.Join(ccvmDir, "foo")
 	err = os.Mkdir(instanceDir, 0750)
 	assert.Nil(t, err)
 
 	ws := &workspace{
-		ciaoDir:     ciaoDir,
+		ccvmDir:     ccvmDir,
 		instanceDir: instanceDir,
 	}
 
@@ -86,6 +86,6 @@ func createMockWorkSpaceWithWorkload(t *testing.T, workload string) *workspace {
 }
 
 func cleanupMockWorkspace(t *testing.T, ws *workspace) {
-	err := os.RemoveAll(ws.ciaoDir)
+	err := os.RemoveAll(ws.ccvmDir)
 	assert.Nil(t, err)
 }
