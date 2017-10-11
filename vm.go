@@ -156,10 +156,10 @@ func sshReady(ctx context.Context, sshPort int) bool {
 }
 
 func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, sshPort int) {
-	status := "ciao down"
+	status := "VM down"
 	ssh := "N/A"
 	if sshReady(ctx, sshPort) {
-		status = "ciao up"
+		status = "VM up"
 		ssh = fmt.Sprintf("ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", keyPath, sshPort)
 	}
 

@@ -52,7 +52,7 @@ func init() {
 		fmt.Fprintln(os.Stderr, "- start : boots a stopped VM")
 		fmt.Fprintln(os.Stderr, "- stop : cleanly powers down a running VM")
 		fmt.Fprintln(os.Stderr, "- quit : quits a running VM")
-		fmt.Fprintln(os.Stderr, "- status : prints status information about the ciao-down VM")
+		fmt.Fprintln(os.Stderr, "- status : prints status information about the ccloudvm VM")
 		fmt.Fprintln(os.Stderr, "- connect : connects to the VM via SSH")
 		fmt.Fprintln(os.Stderr, "- delete : shuts down and deletes the VM")
 	}
@@ -345,7 +345,7 @@ func create(ctx context.Context, errCh chan error) {
 		return
 	}
 	fmt.Println("VM successfully created!")
-	fmt.Println("Type ciao-down connect to start using it.")
+	fmt.Println("Type ccloudvm connect to start using it.")
 }
 
 func start(ctx context.Context, errCh chan error) {

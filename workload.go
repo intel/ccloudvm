@@ -33,7 +33,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-const ciaoDownPkg = "github.com/ciao-project/ciao/testutil/ciao-down"
+const ccloudvmPkg = "github.com/intel/ccloudvm"
 
 var indentedRegexp *regexp.Regexp
 
@@ -116,16 +116,15 @@ func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string) (
 		return wkld, nil
 	}
 
-	localPath := filepath.Join(ws.Home, ".ciao-down", "workloads",
-		fmt.Sprintf("%s.yaml", workloadName))
+	localPath := filepath.Join(ws.ccvmDir, "workloads", fmt.Sprintf("%s.yaml", workloadName))
 	wkld, err = ioutil.ReadFile(localPath)
 	if err == nil {
 		return wkld, nil
 	}
 
-	p, err := build.Default.Import(ciaoDownPkg, "", build.FindOnly)
+	p, err := build.Default.Import(ccloudvmPkg, "", build.FindOnly)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to locate ciao-down workload directory: %v", err)
+		return nil, fmt.Errorf("Unable to locate ccloudvm workload directory: %v", err)
 	}
 	workloadPath := filepath.Join(p.Dir, "workloads", fmt.Sprintf("%s.yaml", workloadName))
 	wkld, err = ioutil.ReadFile(workloadPath)
@@ -200,7 +199,7 @@ func restoreWorkload(ws *workspace) (*workload, error) {
 		return nil, fmt.Errorf("Invalid workload")
 	}
 	if len(docs) == 1 {
-		// Older versions of ciao-down just stored the VM data and not the
+		// Older versions of ccloudvm just stored the VM data and not the
 		// entire workload.
 		if err = wkld.spec.VM.unmarshalWithTemplate(ws, string(docs[0])); err != nil {
 			return nil, err

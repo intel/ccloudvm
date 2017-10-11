@@ -18,14 +18,14 @@ package main
 
 import "github.com/ciao-project/ciao/osprepare"
 
-var ciaoDevClearDeps = []osprepare.PackageRequirement{
+var ccloudvmClearDeps = []osprepare.PackageRequirement{
 	{BinaryName: "/usr/bin/qemu-system-x86_64", PackageName: "cloud-control"},
 	{BinaryName: "/usr/bin/xorriso", PackageName: "cloud-control"},
 	{BinaryName: "/usr/bin/ssh", PackageName: "openssh-server"},
 	{BinaryName: "/usr/bin/ssh-keygen", PackageName: "openssh-server"},
 }
 
-var ciaoDevFedoraDeps = []osprepare.PackageRequirement{
+var ccloudvmFedoraDeps = []osprepare.PackageRequirement{
 	{BinaryName: "/usr/bin/qemu-system-x86_64", PackageName: "qemu-system-x86"},
 	{BinaryName: "/usr/bin/qemu-img", PackageName: "qemu-img"},
 	{BinaryName: "/usr/bin/xorriso", PackageName: "xorriso"},
@@ -33,7 +33,7 @@ var ciaoDevFedoraDeps = []osprepare.PackageRequirement{
 	{BinaryName: "/usr/bin/ssh-keygen", PackageName: "openssh-clients"},
 }
 
-var ciaoDevUbuntuDeps = []osprepare.PackageRequirement{
+var ccloudvmUbuntuDeps = []osprepare.PackageRequirement{
 	{BinaryName: "/usr/bin/qemu-system-x86_64", PackageName: "qemu-system-x86"},
 	{BinaryName: "/usr/bin/qemu-img", PackageName: "qemu-utils"},
 	{BinaryName: "/usr/bin/xorriso", PackageName: "xorriso"},
@@ -41,8 +41,8 @@ var ciaoDevUbuntuDeps = []osprepare.PackageRequirement{
 	{BinaryName: "/usr/bin/ssh-keygen", PackageName: "openssh-client"},
 }
 
-var ciaoDevDeps = map[string][]osprepare.PackageRequirement{
-	"clearlinux": ciaoDevClearDeps,
-	"fedora":     ciaoDevFedoraDeps,
-	"ubuntu":     ciaoDevUbuntuDeps,
+var ccloudvmDeps = map[string][]osprepare.PackageRequirement{
+	"clearlinux": ccloudvmClearDeps,
+	"fedora":     ccloudvmFedoraDeps,
+	"ubuntu":     ccloudvmUbuntuDeps,
 }

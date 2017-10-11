@@ -141,7 +141,7 @@ func downloadFile(ctx context.Context, URL, ccvmDir string, cb progressCB) (stri
 	}
 
 	// Handles legacy code in which the ubuntu image used to be stored in
-	// the root of the ~/.ciao_down directory.  We don't want to move the
+	// the root of the ~/.ccloudvm directory.  We don't want to move the
 	// old image as this would break any existing VMs based off it.
 
 	oldImgPath := path.Join(ccvmDir, di.imageName)

@@ -29,7 +29,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-// Constants for the Guest image used by ciao-down
+// Constants for the Guest image used by ccloudvm
 
 const (
 	guestDownloadURL       = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
@@ -86,7 +86,7 @@ type workloadSpec struct {
 
 // This function creates a default instanceData object for legacy ciao-down
 // ciao VMs.  These old VMs did not store information about mounts and
-// mapped ports as this information was hard-coded into ciao-down itself.
+// mapped ports as this information was hard-coded into ccloudvm itself.
 // Consequently, when migrating one of these old VMs we need to fill in
 // the missing information.
 func (in *VMSpec) loadLegacyInstance(ws *workspace) error {

@@ -95,7 +95,7 @@ func (w *workspace) MountPath(tag string) string {
 }
 
 func installDeps(ctx context.Context) {
-	osprepare.InstallDeps(ctx, ciaoDevDeps, logger{})
+	osprepare.InstallDeps(ctx, ccloudvmDeps, logger{})
 }
 
 func hostSupportsNestedKVMIntel() bool {
