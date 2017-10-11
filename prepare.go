@@ -197,6 +197,9 @@ func prepareEnv(ctx context.Context) (*workspace, error) {
 
 	ws.NoProxy = os.Getenv("no_proxy")
 	ws.ciaoDir = path.Join(ws.Home, ".ciao-down")
+	if _, err := os.Stat(ws.ciaoDir); err != nil {
+		ws.ciaoDir = path.Join(ws.Home, ".ccloudvm")
+	}
 	ws.instanceDir = path.Join(ws.ciaoDir, "instance")
 	ws.keyPath = path.Join(ws.ciaoDir, "id_rsa")
 	ws.publicKeyPath = fmt.Sprintf("%s.pub", ws.keyPath)
