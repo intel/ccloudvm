@@ -66,7 +66,7 @@ const sampleWorkload3Docs = "---\n" + xenialWorkloadSpecNoVM + "...\n---\n" + sa
 const sampleWorkload = "---\n" + xenialWorkloadSpec + "...\n---\n" + sampleCloudInit + "...\n"
 
 func createMockWorkSpaceWithWorkload(t *testing.T, workload string) *workspace {
-	ciaoDir, err := ioutil.TempDir("", "ciao-down-tests-")
+	ciaoDir, err := ioutil.TempDir("", "ccloudvm-tests-")
 	assert.Nil(t, err)
 
 	instanceDir := path.Join(ciaoDir, "foo")
