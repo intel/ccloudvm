@@ -1,8 +1,8 @@
-# ciao-down
+# Configurable Cloud VM (ccloudvm)
 
 ## Introduction
 
-ciao-down is a small utility that simplifies the task of creating,
+ccloudvm is a small utility that simplifies the task of creating,
 managing and connecting to virtual machines.  All you need to have
 installed on your machine is:
 
@@ -11,11 +11,11 @@ installed on your machine is:
 Then simply type
 
 ```
-go get github.com/ciao-project/ciao/testutil/ciao-down
-$GOPATH/bin/ciao-down create xenial
+go get github.com/intel/ccloudvm
+$GOPATH/bin/ccloudvm create xenial
 ```
 
-to create a new Ubuntu 16.04 VM.  ciao-down will install some needed
+to create a new Ubuntu 16.04 VM.  ccloudvm will install some needed
 dependencies on your local PC such as qemu and xorriso. It will then
 download an Ubuntu Cloud Image and create a VM based on this image.
 It will boot the VM, create an account for you, with the same
@@ -26,13 +26,13 @@ Once it's finished you'll be able to connect to the the VM via SSH
 using the following command.
 
 ```
-ciao-down connect
+ccloudvm connect
 ```
 
 The command above assumes that either $GOPATH/bin or ~/go/bin is in
 your PATH.
 
-ciao-down will cache the Ubuntu image locally so the next time you
+ccloudvm will cache the Ubuntu image locally so the next time you
 create another xenial based VM you won't have to wait very long.
 It also knows about HTTP proxies and will mirror your host computer's proxy
 settings inside the VMs it creates.
@@ -40,7 +40,7 @@ settings inside the VMs it creates.
 You can delete the VM you've just created by running,
 
 ```
-ciao-down delete
+ccloudvm delete
 ```
 
 ## Workloads
@@ -58,45 +58,45 @@ can specify:
   to run on the first boot of the VM.  This file is used to create
   user accounts, install packages and configure the VM.
 
-ciao-down ships with a number of workloads for creating VMs based on standard images,
+ccloudvm ships with a number of workloads for creating VMs based on standard images,
 such as Ubuntu 16.04 and Fedora 25.  Users are also free to create their own workloads.
-Standard workloads are stored in $GOPATH/src/github.com/ciao-project/ciao/testutil/ciao-down/workloads.
-User created workloads are stored in ~/.ciao-down/workloads.  ciao-down always checks the
-~/.ciao-down/workloads directory first so if a workload exists in both directories
-with the same name, ciao-down will use the workload in ~/.ciao-down/workloads.
+Standard workloads are stored in $GOPATH/src/github.com/intel/ccloudvm/workloads.
+User created workloads are stored in ~/.ccloudvm/workloads.  ccloudvm always checks the
+~/.ccloudvm/workloads directory first so if a workload exists in both directories
+with the same name, ccloudvm will use the workload in ~/.ccloudvm/workloads.
 
 Which workload to use is specified when creating the VM with the create
 command. The workload can be a file without the .yaml extension or a URI pointing to
 a local or remote file. If the workload is a file without the .yaml extension then it
 must be present in either of the two directories mentioned above. For example,
 the create command in the introduction section creates an Ubuntu 16.04
-workload (xenial).  This caused ciao-down to load the workload definition in
-$GOPATH/src/github.com/ciao-project/ciao/testutil/ciao-down/workloads/xenial.yaml.
+workload (xenial).  This caused ccloudvm to load the workload definition in
+$GOPATH/src/github.com/intel/ccloudvm/workloads/xenial.yaml.
 In the case of a remote file the supported schemes are http, https and file. Be aware
-of the remote file will not be saved hence each time this option is used, ciao-down
+of the remote file will not be saved hence each time this option is used, ccloudvm
 will try to get it from the remote location. For example, to create a workload using the
 file /home/x/workload.yaml we have two options.
 
 Using the file scheme:
 
 ```
-ciao-down create file:///home/ciao-down/workload.yaml
+ccloudvm create file:///home/ccloudvm/workload.yaml
 ```
 
 or its absolute path:
 
 ```
-ciao-down create  /home/ciao-down/workload.yaml
+ccloudvm create  /home/ccloudvm/workload.yaml
 ```
 
 
-As the majority of the ciao-down workloads are cloud-init files, ciao-down only
+As the majority of the ccloudvm workloads are cloud-init files, ccloudvm only
 works with images that are designed to run cloud-init on their first boot.  Typically,
 these are the cloud images, e.g.,. the [Ubuntu Cloud Images](https://cloud-images.ubuntu.com/).
 
 ## Creating new Workloads
 
-ciao-down workloads are multi-doc YAML files.  The first document contains invariants
+ccloudvm workloads are multi-doc YAML files.  The first document contains invariants
 about the VM created from the workload such as the image off which it is based and its
 hostname.  The second contains dynamic instance data that can be altered on every boot,
 such as the number of CPUs the VM uses and the ports mapped.  The final document contains
@@ -140,14 +140,14 @@ host's environment and the instance that is being created.  The following pieces
 of information are available via the workload structure.
 
  - GoPath         : The GoPath on the host or ~/go if GOPATH is not defined
- - Home           : The home directory of the user who ran ciao-down
+ - Home           : The home directory of the user who ran ccloudvm
  - HTTPProxy      : The hosts HTTP proxy if set
  - HTTPSProxy     : The hosts HTTPS proxy if set
  - NoProxy        : The value of the host's no_proxy variable
- - User           : The user who invoked ciao-down
+ - User           : The user who invoked ccloudvm
  - PublicKey      : The public key that will be used to access the instance over SSH
- - GitUserName    : The git user name of the user who ran ciao-down
- - GitEmail       : The git email address of the user who ran ciao-down
+ - GitUserName    : The git user name of the user who ran ccloudvm
+ - GitEmail       : The git email address of the user who ran ccloudvm
  - Mounts         : A slice of mounts, each describing a path to be shared between guest and host
  - Hostname       : The instance hostname
  - UUID           : A UUID for the new instance
@@ -182,7 +182,7 @@ the instance.    Four fields are currently defined:
 
 Each port object has two members, host and guest.  They are both integers and they specify
 the mapping of port numbers from host to guest.  A default mapping of 10022 to 22 is always
-added so that users can connect to their VMs via ciao-down connect.  An example port
+added so that users can connect to their VMs via ccloudvm connect.  An example port
 mapping is shown below:
 
 ```
@@ -244,7 +244,7 @@ is processed by the Go template engine before being passed to cloudinit
 running inside the guest VM.  The template engine makes a number of
 functions available to the cloudinit document.  These functions are used
 to perform common tasks such as configuring proxies and communicating with
-ciao-down running on the host.  Each function must be passed the
+ccloudvm running on the host.  Each function must be passed the
 workspace object as the first parameter.  The following functions are
 available:
 
@@ -282,7 +282,7 @@ write_files:
 
 Download should be used to download files from inside the guest.  Download is preferable
 to directly downloading files inside the cloudinit document using curl or wget for
-example, as the downloaded files are cached by ciao-down.  This means that the next time
+example, as the downloaded files are cached by ccloudvm.  This means that the next time
 an instance of this workload is created the file will not have to be retrieved from
 the Internet, resulting in quicker boot times for the new VM.
 
@@ -301,7 +301,7 @@ An example of its usage is
 #### The task functions
 
 There are four functions that can be used to provide visual information back to the user
-who invoked ciao-down on the host.  These functions should always be issued in pairs.
+who invoked ccloudvm on the host.  These functions should always be issued in pairs.
 The first function invoked should always be beginTask.
 
 beginTask takes two parameters.  The first is the workspace object.  The second is a
@@ -331,7 +331,7 @@ Unpacking Go : [FAIL]
 
 if it fails.
 
-Reporting a failure back to ciao-down does not cause the create command to exit.  The
+Reporting a failure back to ccloudvm does not cause the create command to exit.  The
 failure is presented to the user and the setup of the VM continues.
 
 #### Finished
@@ -370,14 +370,14 @@ Mounts added later via the start command will need to be mounted manually.
 
 ### create
 
-ciao-down create creates and configures a new ciao-down VM.  Currently,
+ccloudvm create creates and configures a new ccloudvm VM.  Currently,
 only one VM can be configured at any one time.  All the files associated
-with the VM are stored in ~/.ciao-down.
+with the VM are stored in ~/.ccloudvm.
 
-An example of ciao-down create is given below:
+An example of ccloudvm create is given below:
 
 ```
-$ ./ciao-down create xenial
+$ ./ccloudvm create xenial
 Booting VM with 7 GB RAM and 4 cpus
 Booting VM : [OK]
 Downloading Go : [OK]
@@ -403,16 +403,16 @@ Downloading latest clear cloud image : [OK]
 Setting git user.name : [OK]
 Setting git user.email : [OK]
 VM successfully created!
-Type ciao-down connect to start using it.
+Type ccloudvm connect to start using it.
 ```
 
-By default, ciao-down will assign half of your host's resources to the VM
+By default, ccloudvm will assign half of your host's resources to the VM
 that it creates and launches.  If you have 8 CPUs and 8 GB of RAM on your
-host, ciao-down will assign 4GB of RAM and 4 VCPUs to the guest VM.  You
+host, ccloudvm will assign 4GB of RAM and 4 VCPUs to the guest VM.  You
 can control this behaviour by using the --mem and --cpu options.  For
 example,
 
-ciao-down create --cpus 2 -mem 2 ciao
+ccloudvm create --cpus 2 -mem 2 ciao
 
 Creates and boots a VM with 2 VCPUs and 2 GB of RAM.
 
@@ -429,15 +429,15 @@ package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
 
 #### Port mappings, Mounts and Drives
 
-By default, ciao-down creates one port mapping for new VMs, 10022-22 for SSH
+By default, ccloudvm creates one port mapping for new VMs, 10022-22 for SSH
 access.  You can specify additional port mappings, mounts or drives or even override
 the default settings on the command line.
 
 For example,
 
-./ciao-down create --mount docs,passthrough,$HOME/Documents --port 10000-80 xenial
+./ccloudvm create --mount docs,passthrough,$HOME/Documents --port 10000-80 xenial
 
-shares the host directory, $HOME/Documents, with the ciao-down VM using the 9p
+shares the host directory, $HOME/Documents, with the ccloudvm VM using the 9p
 passthrough security model.  The directory can be mounted inside the VM using
 the docs tag.  The command also adds a new port mapping.  127.0.0.1:10000 on
 the host now maps to port 80 on the guest.
@@ -451,7 +451,7 @@ through to the underlying hypervisor.  For example, let's suppose we
 have a qcow2 file called $HOME/img.qcow2.  We could make this file
 accessible as a block device in our VM as follows.
 
-./ciao-down create --drive $HOME/img.qcow2,qcow2,aio=threads
+./ccloudvm create --drive $HOME/img.qcow2,qcow2,aio=threads
 
 The drive will appear as a device, e.g., /dev/vdc in the VM.
 
@@ -463,7 +463,7 @@ overridden by mapping a new host port to an existing guest port and
 existing drives can be overridden by providing a new set of options for
 an existing drive path.  For example,
 
-./ciao-down create --mount hostgo,none,$HOME/go -port 10023-22 xenial
+./ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
 
 changes the security model of the mount with the hostgo tag and makes the instance
 available via ssh on 127.0.0.1:10023.
@@ -471,26 +471,26 @@ available via ssh on 127.0.0.1:10023.
 
 ### delete
 
-ciao-down delete, shuts down and deletes all the files associated with the VM.
+ccloudvm delete, shuts down and deletes all the files associated with the VM.
 
 ### status
 
-ciao-down status provides information about the current ciao-down VM, e.g., whether
+ccloudvm status provides information about the current ccloudvm VM, e.g., whether
 it is running, and how to connect to it.  For example,
 
 ```
-$ ciao-down status
+$ ccloudvm status
 Status	:	ciao up
-SSH	:	ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /home/user/.ciao-down/id_rsa 127.0.0.1 -p 10022
+SSH	:	ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /home/user/.ccloudvm/id_rsa 127.0.0.1 -p 10022
 ```
 
 ### stop
 
-ciao-down stop is used to power down the ciao-down VM cleanly.
+ccloudvm stop is used to power down the ccloudvm VM cleanly.
 
 ### start
 
-ciao-down start boots a previously created but not running ciao-down VM.
+ccloudvm start boots a previously created but not running ccloudvm VM.
 The start command also supports the --mem and --cpu options.  So it's
 possible to change the resources assigned to the guest VM by stopping it
 and restarting it, specifying --mem and --cpu.  It's also possible to
@@ -502,18 +502,18 @@ you originally passed to create.  These settings are also persisted.
 For example, if you were to run
 
 ```
-./ciao-down create --mem=2 xenial
-./ciao-down stop
-./ciao-down start --mem=1
-./ciao-down stop
-./ciao-down start
+./ccloudvm create --mem=2 xenial
+./ccloudvm stop
+./ccloudvm start --mem=1
+./ccloudvm stop
+./ccloudvm start
 ```
 
-The final ciao-down instance would boot with 1GB of RAM even though no mem
+The final ccloudvm instance would boot with 1GB of RAM even though no mem
 parameter was provided.
 
 ### quit
 
-ciao-down quit terminates the VM immediately.  It does not shut down the OS
+ccloudvm quit terminates the VM immediately.  It does not shut down the OS
 running in the VM cleanly.
 
