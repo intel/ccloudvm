@@ -17,13 +17,9 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path"
-	"testing"
-
-	"os"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const xenialWorkloadSpecNoVM = `
@@ -65,13 +61,11 @@ const sampleCloudInit = `
 const sampleWorkload3Docs = "---\n" + xenialWorkloadSpecNoVM + "...\n---\n" + sampleVMSpec + "...\n---\n" + sampleCloudInit + "...\n"
 const sampleWorkload = "---\n" + xenialWorkloadSpec + "...\n---\n" + sampleCloudInit + "...\n"
 
-func createMockWorkSpaceWithWorkload(t *testing.T, workload string) *workspace {
-	ccvmDir, err := ioutil.TempDir("", "ccloudvm-tests-")
-	assert.Nil(t, err)
-
-	instanceDir := path.Join(ccvmDir, "foo")
-	err = os.Mkdir(instanceDir, 0750)
-	assert.Nil(t, err)
+func createMockWorkSpaceWithWorkload(workload, ccvmDir string) (*workspace, error) {
+	instanceDir, err := ioutil.TempDir(ccvmDir, "wkl-")
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create directory %s: %v", instanceDir, err)
+	}
 
 	ws := &workspace{
 		ccvmDir:     ccvmDir,
@@ -80,12 +74,9 @@ func createMockWorkSpaceWithWorkload(t *testing.T, workload string) *workspace {
 
 	workloadFile := path.Join(ws.instanceDir, "state.yaml")
 	err = ioutil.WriteFile(workloadFile, []byte(workload), 0640)
-	assert.Nil(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write workload file %s: %v", workloadFile, err)
+	}
 
-	return ws
-}
-
-func cleanupMockWorkspace(t *testing.T, ws *workspace) {
-	err := os.RemoveAll(ws.ccvmDir)
-	assert.Nil(t, err)
+	return ws, nil
 }

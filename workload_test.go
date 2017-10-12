@@ -17,9 +17,12 @@
 package main
 
 import (
+	"io/ioutil"
+	"os"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 const document1 = `# Just a simple document
@@ -33,6 +36,14 @@ const document2 = `# A list
 `
 
 const twoDocuments = "---\n" + document1 + "...\n----\n" + document2 + "...\n"
+
+func toStringSlice(s [][]byte) []string {
+	ss := make([]string, len(s))
+	for i := range s {
+		ss[i] = string(s[i])
+	}
+	return ss
+}
 
 func TestSplitYaml(t *testing.T) {
 	tests := []struct {
@@ -48,7 +59,15 @@ func TestSplitYaml(t *testing.T) {
 		test := &tests[i]
 
 		documents := splitYaml([]byte(test.content))
-		assert.Equal(t, test.documents, documents)
+		diff, _ := difflib.GetContextDiffString(difflib.ContextDiff{
+			A:        toStringSlice(test.documents),
+			B:        toStringSlice(documents),
+			FromFile: "Expected",
+			ToFile:   "Got",
+		})
+		if diff != "" {
+			t.Errorf("%s", diff)
+		}
 	}
 }
 
@@ -65,20 +84,50 @@ func TestRestoreWorkload(t *testing.T) {
 		{workload: sampleWorkload3Docs, checkSpec: true},
 	}
 
+	ccvmDir, err := ioutil.TempDir("", "ccloudvm-tests-")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+
+	defer func() {
+		if err := os.RemoveAll(ccvmDir); err != nil {
+			t.Errorf("Failed to remove %s : %v", ccvmDir, err)
+		}
+	}()
+
 	for i := range tests {
 		test := &tests[i]
 
-		ws := createMockWorkSpaceWithWorkload(t, test.workload)
-
-		workload, err := restoreWorkload(ws)
-		assert.Nil(t, err)
-		assert.Equal(t, mockVMSpec, workload.spec.VM)
-		if test.checkSpec {
-			assert.Equal(t, guestDownloadURL, workload.spec.BaseImageURL)
-			assert.Equal(t, guestImageFriendlyName, workload.spec.BaseImageName)
-			assert.Equal(t, defaultHostname, workload.spec.Hostname)
+		ws, err := createMockWorkSpaceWithWorkload(test.workload, ccvmDir)
+		if err != nil {
+			t.Errorf("Failed to create mock workload : %v", err)
+			continue
 		}
 
-		cleanupMockWorkspace(t, ws)
+		workload, err := restoreWorkload(ws)
+		if err != nil {
+			t.Errorf("Unable to restore workload %d", i, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(mockVMSpec, workload.spec.VM) {
+			t.Errorf("Expected %+v got %+v", mockVMSpec, workload.spec.VM)
+			continue
+		}
+
+		if test.checkSpec {
+			if guestDownloadURL != workload.spec.BaseImageURL {
+				t.Errorf("URLs do not match expected %s got %s",
+					guestDownloadURL, workload.spec.BaseImageURL)
+			}
+			if guestImageFriendlyName != workload.spec.BaseImageName {
+				t.Errorf("Names do not match expected %s got %s",
+					guestImageFriendlyName, workload.spec.BaseImageName)
+			}
+			if defaultHostname != workload.spec.Hostname {
+				t.Errorf("Hostnames do not match expected %s got %s",
+					defaultHostname, workload.spec.Hostname)
+			}
+		}
 	}
 }
