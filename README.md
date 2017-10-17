@@ -1,5 +1,8 @@
 # Configurable Cloud VM (ccloudvm)
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/intel/ccloudvm)](https://goreportcard.com/report/github.com/intel/ccloudvm)
+[![Build Status](https://travis-ci.org/intel/ccloudvm.svg?branch=master)](https://travis-ci.org/intel/ccloudvm)
+
 ## Introduction
 
 ccloudvm is a small utility that simplifies the task of creating,
