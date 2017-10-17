@@ -168,7 +168,7 @@ func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, ss
 	fmt.Fprintf(w, "Workload\t:\t%s\n", workloadName)
 	fmt.Fprintf(w, "Status\t:\t%s\n", status)
 	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
-	w.Flush()
+	_ = w.Flush()
 }
 
 func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
