@@ -381,30 +381,12 @@ An example of ccloudvm create is given below:
 
 ```
 $ ./ccloudvm create xenial
+Installing host dependencies
+OS Detected: ubuntu
+Downloading Ubuntu 16.04
 Booting VM with 7 GB RAM and 4 cpus
 Booting VM : [OK]
-Downloading Go : [OK]
-Unpacking Go : [OK]
-Installing apt-transport-https and ca-certificates : [OK]
-Add docker GPG key : [OK]
-Retrieving updated list of packages : [OK]
-Upgrading : [OK]
-Installing Docker : [OK]
-Installing GCC : [OK]
-Installing Make : [OK]
-Installing QEMU : [OK]
-Installing xorriso : [OK]
-Installing ceph-common : [OK]
-Installing Openstack client : [OK]
-Auto removing unused components : [OK]
-Building ciao : [OK]
-Installing Go development utils : [OK]
-Pulling ceph/demo : [OK]
-Downloading Fedora-Cloud-Base-24-1.2.x86_64.qcow2 : [OK]
-Downloading CNCI image : [OK]
-Downloading latest clear cloud image : [OK]
-Setting git user.name : [OK]
-Setting git user.email : [OK]
+Adding singlevm to /etc/hosts : [OK]
 VM successfully created!
 Type ccloudvm connect to start using it.
 ```
