@@ -106,7 +106,7 @@ func TestRestoreWorkload(t *testing.T) {
 
 		workload, err := restoreWorkload(ws)
 		if err != nil {
-			t.Errorf("Unable to restore workload %d", i, err)
+			t.Errorf("Unable to restore workload %d : %v", i, err)
 			continue
 		}
 
