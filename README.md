@@ -466,7 +466,7 @@ it is running, and how to connect to it.  For example,
 ```
 $ ccloudvm status
 Status	:	ciao up
-SSH	:	ssh -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /home/user/.ccloudvm/id_rsa 127.0.0.1 -p 10022
+SSH	:	ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /home/user/.ccloudvm/id_rsa 127.0.0.1 -p 10022
 ```
 
 ### stop
