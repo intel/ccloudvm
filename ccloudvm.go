@@ -506,7 +506,8 @@ func connect(ctx context.Context, errCh chan error) {
 	}
 
 	err = syscall.Exec(path, []string{path,
-		"-q", "-o", "UserKnownHostsFile=/dev/null",
+		"-q", "-F", "/dev/null",
+		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "IdentitiesOnly=yes",
 		"-i", ws.keyPath,
