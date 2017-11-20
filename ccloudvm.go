@@ -140,12 +140,13 @@ func (d *drives) Set(value string) error {
 	return nil
 }
 
-func vmFlags(fs *flag.FlagSet, memGB, CPUs *int, m *mounts, p *ports, d *drives) {
+func vmFlags(fs *flag.FlagSet, memGB, CPUs *int, m *mounts, p *ports, d *drives, qemuport *uint) {
 	fs.IntVar(memGB, "mem", *memGB, "Gigabytes of RAM allocated to VM")
 	fs.IntVar(CPUs, "cpus", *CPUs, "VCPUs assigned to VM")
 	fs.Var(m, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
 	fs.Var(d, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
 	fs.Var(p, "port", "port mapping. Format is host_port-guest_port, e.g., -port 10022-22")
+	fs.UintVar(qemuport, "qemuport", *qemuport, "Port to follow qemu logs of the guest machine, eg., --qemuport=9999")
 }
 
 func checkDirectory(dir string) error {
@@ -175,6 +176,7 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	var p ports
 	var d drives
 	var memGiB, CPUs int
+	var qemuport uint
 	var update packageUpgrade
 
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
@@ -183,7 +185,7 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 		fmt.Fprintf(os.Stderr, "  <workload>\tName of the workload to create\n\n")
 		fs.PrintDefaults()
 	}
-	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d)
+	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d, &qemuport)
 	fs.BoolVar(&debug, "debug", false, "Enables debug mode")
 	fs.Var(&update, "package-upgrade",
 		"Hint to enable or disable update of VM packages. Should be true or false")
@@ -216,6 +218,9 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	if CPUs != 0 {
 		in.CPUs = CPUs
 	}
+	if qemuport != 0 {
+		in.Qemuport = qemuport
+	}
 
 	in.mergeMounts(m)
 	in.mergePorts(p)
@@ -240,9 +245,10 @@ func startFlags(in *VMSpec) error {
 
 	CPUs := in.CPUs
 	memGiB := in.MemGiB
+	qemuport := in.Qemuport
 
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d)
+	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d, &qemuport)
 	if err := fs.Parse(flag.Args()[1:]); err != nil {
 		return err
 	}
@@ -255,6 +261,7 @@ func startFlags(in *VMSpec) error {
 
 	in.CPUs = CPUs
 	in.MemGiB = memGiB
+	in.Qemuport = qemuport
 	in.mergeMounts(m)
 	in.mergePorts(p)
 	in.mergeDrives(d)
@@ -455,7 +462,7 @@ func status(ctx context.Context, errCh chan error) {
 	}
 
 	statusVM(ctx, ws.instanceDir, ws.keyPath, wkld.spec.WorkloadName,
-		sshPort)
+		sshPort, in.Qemuport)
 	errCh <- err
 }
 

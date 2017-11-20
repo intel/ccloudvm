@@ -73,6 +73,7 @@ type VMSpec struct {
 	PortMappings []portMapping `yaml:"ports"`
 	Mounts       []mount       `yaml:"mounts"`
 	Drives       []drive       `yaml:"drives"`
+	Qemuport     uint          `yaml:"qemuport"`
 }
 
 type workloadSpec struct {
