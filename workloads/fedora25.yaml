@@ -6,20 +6,25 @@ hostname: singlevm
 ---
 #cloud-config
 write_files:
+{{- if len $.HTTPProxy }}
+ - content: |
+     [Service]
+     Environment="HTTP_PROXY={{$.HTTPProxy}}"{{if len .HTTPSProxy}} "HTTPS_PROXY={{.HTTPSProxy}}{{end}}"{{if len .NoProxy}} "NO_PROXY={{.NoProxy}},{{.Hostname}}{{end}}"
+   path: /etc/systemd/system/docker.service.d/http-proxy.conf
+{{- end}}
 {{with proxyEnv . 5}}
  - content: |
 {{.}}
    path: /etc/environment
 {{end -}}
-{{with .HTTPProxy}}
- - content: |
-     [main]
-     gpgcheck=1
-     installonly_limit=3
-     clean_requirements_on_remove=True
-     proxy={{.}}
-   path: /etc/dnf/dnf.conf
-{{end}}
+
+dnf:
+{{- if len $.HTTPProxy }}
+  proxy: "{{$.HTTPProxy}}"
+{{- end}}
+{{- if len $.HTTPSProxy }}
+  https_proxy: "{{$.HTTPSProxy}}"
+{{- end}}
 
 package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
 
@@ -45,7 +50,7 @@ runcmd:
 {{end}}
 
  - {{finished .}}
-  
+
 users:
   - name: {{.User}}
     gecos: CC Demo User
@@ -54,4 +59,4 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh-authorized-keys:
     - {{.PublicKey}}
-
+...
