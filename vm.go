@@ -97,6 +97,12 @@ func bootVM(ctx context.Context, ws *workspace, in *VMSpec) error {
 		args = append(args, "-net", netParam)
 	}
 
+	if in.Qemuport != 0 {
+		args = append(args, "-chardev",
+			fmt.Sprintf("socket,host=localhost,port=%d,id=ccld0,server,nowait", in.Qemuport),
+			"-device", "isa-serial,chardev=ccld0")
+	}
+
 	args = append(args, "-display", "none", "-vga", "none")
 
 	output, err := qemu.LaunchCustomQemu(ctx, "", args, nil, nil)
@@ -155,7 +161,7 @@ func sshReady(ctx context.Context, sshPort int) bool {
 	return retval
 }
 
-func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, sshPort int) {
+func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, sshPort int, qemuport uint) {
 	status := "VM down"
 	ssh := "N/A"
 	if sshReady(ctx, sshPort) {
@@ -168,6 +174,9 @@ func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, ss
 	fmt.Fprintf(w, "Workload\t:\t%s\n", workloadName)
 	fmt.Fprintf(w, "Status\t:\t%s\n", status)
 	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
+	if qemuport != 0 {
+		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", qemuport)
+	}
 	_ = w.Flush()
 }
 

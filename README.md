@@ -411,6 +411,18 @@ the workloads define the following in their cloudinit documents.
 ```
 package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
 ```
+The -qemuport option can be used to follow qemu boot logs by connecting to user defined port or an entry in the workload yaml
+file.
+
+For example,
+
+--qemuport=9999
+
+will let you track qemu logs by running the below command
+
+nc localhost 9999
+
+You can also allow a login via this port in case ssh fails to work by modifying the workload file and changing lock_passwd to false and providing a passwd: "....." entry following that.
 
 #### Port mappings, Mounts and Drives
 
@@ -496,6 +508,17 @@ For example, if you were to run
 
 The final ccloudvm instance would boot with 1GB of RAM even though no mem
 parameter was provided.
+
+The -qemuport option can be used to follow qemu boot logs by connecting to user defined port or an entry in the workload yaml
+file.
+
+For example,
+
+./ccloudvm start -qemuport 9999
+
+will let you track qemu logs by running the below command
+
+nc localhost 9999
 
 ### quit
 
