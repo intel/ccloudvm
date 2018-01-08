@@ -11,7 +11,7 @@ _DeploymentAndDistroPackaging/ansible/images/
 _DeploymentAndDistroPackaging/ansible/openrc
 .DS_Store
 ciao-cert/ciao-cert
-ciao-cli/ciao-cli
+ciao/ciao
 ciao-controller/ciao-controller
 ciao-launcher/ciao-launcher
 ciao-launcher/tests/ciao-launcher-server/ciao-launcher-server
@@ -25,4 +25,3 @@ networking/libsnnet/tests/cncicli/cncicli
 networking/libsnnet/tests/cncli/cncli
 networking/libsnnet/tests/snnetcli/snnetcli
 test-cases/test-cases
-testutil/ciao-down/ciao-down

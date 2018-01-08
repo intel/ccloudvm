@@ -4,7 +4,7 @@
 [[projects]]
   name = "github.com/ciao-project/ciao"
   packages = ["clogger","deviceinfo","osprepare","uuid"]
-  revision = "60525fba8e5f4f1bf3ad02b8f5854c4dcf735a78"
+  revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
 
 [[projects]]
   branch = "master"
@@ -22,7 +22,7 @@
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
+  revision = "1244d3ce02e3e1c16820ada0bae506b6c479f106"
 
 [solve-meta]
   analyzer-name = "dep"
