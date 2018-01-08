@@ -3,8 +3,14 @@
 
 [[projects]]
   name = "github.com/ciao-project/ciao"
-  packages = ["clogger","deviceinfo","osprepare","qemu","uuid"]
+  packages = ["clogger","deviceinfo","osprepare","uuid"]
   revision = "60525fba8e5f4f1bf3ad02b8f5854c4dcf735a78"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/intel/govmm"
+  packages = ["qemu"]
+  revision = "22c99930c2f69fff02926e90803e4a7168d08240"
 
 [[projects]]
   name = "github.com/pmezard/go-difflib"
@@ -21,6 +27,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e77d825c83d41d01f513cb4f6035c4d2ffaf7920793956fd1902f1b928e51d61"
+  inputs-digest = "b1733143571f6b77c233fa2a63490ddcb37a1fd63a39092a3183be0c67637d79"
   solver-name = "gps-cdcl"
   solver-version = 1

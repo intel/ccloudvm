@@ -21,9 +21,10 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/ciao-project/ciao/testutil"
 )
+
+const agentUUID = "4cb19522-1e18-439a-883a-f9b2a3a95f5e"
+const volumeUUID = "67d86208-b46c-4465-9018-e14187d4010"
 
 func testAppend(structure interface{}, expected string, t *testing.T) {
 	var config Config
@@ -51,7 +52,9 @@ func testAppend(structure interface{}, expected string, t *testing.T) {
 
 	case SMP:
 		config.SMP = s
-		config.appendCPUs()
+		if err := config.appendCPUs(); err != nil {
+			t.Fatalf("Unexpected error: %v\n", err)
+		}
 
 	case QMPSocket:
 		config.QMPSockets = []QMPSocket{s}
@@ -120,14 +123,36 @@ func TestAppendDeviceFS(t *testing.T) {
 	testAppend(fsdev, deviceFSString, t)
 }
 
-var deviceNetworkString = "-device virtio-net,disable-modern=true,netdev=tap0,mac=01:02:de:ad:be:ef -netdev tap,id=tap0,ifname=ceth0,downscript=no,script=no,fds=3:4,vhost=on"
+var deviceNetworkString = "-netdev tap,id=tap0,vhost=on,ifname=ceth0,downscript=no,script=no -device driver=virtio-net-pci,netdev=tap0,mac=01:02:de:ad:be:ef,disable-modern=true"
 
 func TestAppendDeviceNetwork(t *testing.T) {
-	foo, _ := ioutil.TempFile(os.TempDir(), "qemu-ciao-test")
-	bar, _ := ioutil.TempFile(os.TempDir(), "qemu-ciao-test")
+	netdev := NetDevice{
+		Driver:        VirtioNet,
+		Type:          TAP,
+		ID:            "tap0",
+		IFName:        "ceth0",
+		Script:        "no",
+		DownScript:    "no",
+		VHost:         true,
+		MACAddress:    "01:02:de:ad:be:ef",
+		DisableModern: true,
+	}
 
-	defer os.Remove(foo.Name())
-	defer os.Remove(bar.Name())
+	testAppend(netdev, deviceNetworkString, t)
+}
+
+var deviceNetworkStringMq = "-netdev tap,id=tap0,vhost=on,fds=3:4 -device driver=virtio-net-pci,netdev=tap0,mac=01:02:de:ad:be:ef,disable-modern=true,mq=on,vectors=6"
+
+func TestAppendDeviceNetworkMq(t *testing.T) {
+	foo, _ := ioutil.TempFile(os.TempDir(), "govmm-qemu-test")
+	bar, _ := ioutil.TempFile(os.TempDir(), "govmm-qemu-test")
+
+	defer func() {
+		_ = foo.Close()
+		_ = bar.Close()
+		_ = os.Remove(foo.Name())
+		_ = os.Remove(bar.Name())
+	}()
 
 	netdev := NetDevice{
 		Driver:        VirtioNet,
@@ -142,17 +167,42 @@ func TestAppendDeviceNetwork(t *testing.T) {
 		DisableModern: true,
 	}
 
-	testAppend(netdev, deviceNetworkString, t)
+	testAppend(netdev, deviceNetworkStringMq, t)
 }
 
-var deviceNetworkPCIString = "-device driver=virtio-net-pci,disable-modern=true,netdev=tap0,mac=01:02:de:ad:be:ef,bus=/pci-bus/pcie.0,addr=ff -netdev tap,id=tap0,ifname=ceth0,downscript=no,script=no,fds=3:4,vhost=on"
+var deviceNetworkPCIString = "-netdev tap,id=tap0,vhost=on,ifname=ceth0,downscript=no,script=no -device driver=virtio-net-pci,netdev=tap0,mac=01:02:de:ad:be:ef,bus=/pci-bus/pcie.0,addr=ff,disable-modern=true"
 
 func TestAppendDeviceNetworkPCI(t *testing.T) {
-	foo, _ := ioutil.TempFile(os.TempDir(), "qemu-ciao-test")
-	bar, _ := ioutil.TempFile(os.TempDir(), "qemu-ciao-test")
 
-	defer os.Remove(foo.Name())
-	defer os.Remove(bar.Name())
+	netdev := NetDevice{
+		Driver:        VirtioNetPCI,
+		Type:          TAP,
+		ID:            "tap0",
+		IFName:        "ceth0",
+		Bus:           "/pci-bus/pcie.0",
+		Addr:          "255",
+		Script:        "no",
+		DownScript:    "no",
+		VHost:         true,
+		MACAddress:    "01:02:de:ad:be:ef",
+		DisableModern: true,
+	}
+
+	testAppend(netdev, deviceNetworkPCIString, t)
+}
+
+var deviceNetworkPCIStringMq = "-netdev tap,id=tap0,vhost=on,fds=3:4 -device driver=virtio-net-pci,netdev=tap0,mac=01:02:de:ad:be:ef,bus=/pci-bus/pcie.0,addr=ff,disable-modern=true,mq=on,vectors=6"
+
+func TestAppendDeviceNetworkPCIMq(t *testing.T) {
+	foo, _ := ioutil.TempFile(os.TempDir(), "govmm-qemu-test")
+	bar, _ := ioutil.TempFile(os.TempDir(), "govmm-qemu-test")
+
+	defer func() {
+		_ = foo.Close()
+		_ = bar.Close()
+		_ = os.Remove(foo.Name())
+		_ = os.Remove(bar.Name())
+	}()
 
 	netdev := NetDevice{
 		Driver:        VirtioNetPCI,
@@ -169,7 +219,7 @@ func TestAppendDeviceNetworkPCI(t *testing.T) {
 		DisableModern: true,
 	}
 
-	testAppend(netdev, deviceNetworkPCIString, t)
+	testAppend(netdev, deviceNetworkPCIStringMq, t)
 }
 
 var deviceSerialString = "-device virtio-serial-pci,disable-modern=true,id=serial0"
@@ -199,13 +249,13 @@ func TestAppendDeviceSerialPort(t *testing.T) {
 	testAppend(chardev, deviceSerialPortString, t)
 }
 
-var deviceBlockString = "-device virtio-blk,disable-modern=true,drive=hd0,scsi=off,config-wce=off -drive id=hd0,file=/var/lib/ciao.img,aio=threads,format=qcow2,if=none"
+var deviceBlockString = "-device virtio-blk,disable-modern=true,drive=hd0,scsi=off,config-wce=off -drive id=hd0,file=/var/lib/vm.img,aio=threads,format=qcow2,if=none"
 
 func TestAppendDeviceBlock(t *testing.T) {
 	blkdev := BlockDevice{
 		Driver:        VirtioBlock,
 		ID:            "hd0",
-		File:          "/var/lib/ciao.img",
+		File:          "/var/lib/vm.img",
 		AIO:           Threads,
 		Format:        QCOW2,
 		Interface:     NoInterface,
@@ -217,6 +267,40 @@ func TestAppendDeviceBlock(t *testing.T) {
 	testAppend(blkdev, deviceBlockString, t)
 }
 
+var deviceVhostUserNetString = "-chardev socket,id=char1,path=/tmp/nonexistentsocket.socket -netdev type=vhost-user,id=net1,chardev=char1,vhostforce -device virtio-net-pci,netdev=net1,mac=00:11:22:33:44:55"
+var deviceVhostUserSCSIString = "-chardev socket,id=char1,path=/tmp/nonexistentsocket.socket -device vhost-user-scsi-pci,id=scsi1,chardev=char1"
+var deviceVhostUserBlkString = "-chardev socket,id=char2,path=/tmp/nonexistentsocket.socket -device vhost-user-blk-pci,logical_block_size=4096,size=512M,chardev=char2"
+
+func TestAppendDeviceVhostUser(t *testing.T) {
+
+	vhostuserBlkDevice := VhostUserDevice{
+		SocketPath:    "/tmp/nonexistentsocket.socket",
+		CharDevID:     "char2",
+		TypeDevID:     "",
+		Address:       "",
+		VhostUserType: VhostUserBlk,
+	}
+	testAppend(vhostuserBlkDevice, deviceVhostUserBlkString, t)
+
+	vhostuserSCSIDevice := VhostUserDevice{
+		SocketPath:    "/tmp/nonexistentsocket.socket",
+		CharDevID:     "char1",
+		TypeDevID:     "scsi1",
+		Address:       "",
+		VhostUserType: VhostUserSCSI,
+	}
+	testAppend(vhostuserSCSIDevice, deviceVhostUserSCSIString, t)
+
+	vhostuserNetDevice := VhostUserDevice{
+		SocketPath:    "/tmp/nonexistentsocket.socket",
+		CharDevID:     "char1",
+		TypeDevID:     "net1",
+		Address:       "00:11:22:33:44:55",
+		VhostUserType: VhostUserNet,
+	}
+	testAppend(vhostuserNetDevice, deviceVhostUserNetString, t)
+}
+
 var deviceVFIOString = "-device vfio-pci,host=02:10.0"
 
 func TestAppendDeviceVFIO(t *testing.T) {
@@ -225,6 +309,48 @@ func TestAppendDeviceVFIO(t *testing.T) {
 	}
 
 	testAppend(vfioDevice, deviceVFIOString, t)
+}
+
+var deviceVSOCKString = "-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=4"
+
+func TestAppendVSOCK(t *testing.T) {
+	vsockDevice := VSOCKDevice{
+		ID:        "vhost-vsock-pci0",
+		ContextID: 4,
+	}
+
+	testAppend(vsockDevice, deviceVSOCKString, t)
+}
+
+func TestVSOCKValid(t *testing.T) {
+	vsockDevice := VSOCKDevice{
+		ID:        "vhost-vsock-pci0",
+		ContextID: MinimalGuestCID - 1,
+	}
+
+	if vsockDevice.Valid() {
+		t.Fatalf("VSOCK Context ID is not valid")
+	}
+
+	vsockDevice.ID = ""
+
+	if vsockDevice.Valid() {
+		t.Fatalf("VSOCK ID is not valid")
+	}
+}
+
+var deviceSCSIControllerStr = "-device virtio-scsi-pci,id=foo"
+var deviceSCSIControllerBusAddrStr = "-device virtio-scsi-pci,id=foo,bus=pci.0,addr=00:04.0"
+
+func TestAppendDeviceSCSIController(t *testing.T) {
+	scsiCon := SCSIController{
+		ID: "foo",
+	}
+	testAppend(scsiCon, deviceSCSIControllerStr, t)
+
+	scsiCon.Bus = "pci.0"
+	scsiCon.Addr = "00:04.0"
+	testAppend(scsiCon, deviceSCSIControllerBusAddrStr, t)
 }
 
 func TestAppendEmptyDevice(t *testing.T) {
@@ -285,7 +411,7 @@ func TestAppendMemory(t *testing.T) {
 	testAppend(memory, memoryString, t)
 }
 
-var cpusString = "-smp 2,cores=1,threads=2,sockets=2"
+var cpusString = "-smp 2,cores=1,threads=2,sockets=2,maxcpus=6"
 
 func TestAppendCPUs(t *testing.T) {
 	smp := SMP{
@@ -293,9 +419,26 @@ func TestAppendCPUs(t *testing.T) {
 		Sockets: 2,
 		Cores:   1,
 		Threads: 2,
+		MaxCPUs: 6,
 	}
 
 	testAppend(smp, cpusString, t)
+}
+
+func TestFailToAppendCPUs(t *testing.T) {
+	config := Config{
+		SMP: SMP{
+			CPUs:    2,
+			Sockets: 2,
+			Cores:   1,
+			Threads: 2,
+			MaxCPUs: 1,
+		},
+	}
+
+	if err := config.appendCPUs(); err == nil {
+		t.Fatalf("Expected appendCPUs to fail")
+	}
 }
 
 var qmpSingleSocketServerString = "-qmp unix:cc-qmp,server,nowait"
@@ -343,13 +486,13 @@ func TestAppendQMPSocketServer(t *testing.T) {
 	testAppend(qmp, qmpSocketServerString, t)
 }
 
-var qemuString = "-name cc-qemu -cpu host -uuid " + testutil.AgentUUID
+var qemuString = "-name cc-qemu -cpu host -uuid " + agentUUID
 
 func TestAppendStrings(t *testing.T) {
 	config := Config{
 		Path:     "qemu",
 		Name:     "cc-qemu",
-		UUID:     testutil.AgentUUID,
+		UUID:     agentUUID,
 		CPUModel: "host",
 	}
 

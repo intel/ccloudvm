@@ -30,8 +30,8 @@ import (
 	"text/template"
 
 	"github.com/ciao-project/ciao/osprepare"
-	"github.com/ciao-project/ciao/qemu"
 	"github.com/ciao-project/ciao/uuid"
+	"github.com/intel/govmm/qemu"
 )
 
 const metaDataTemplate = `
@@ -221,7 +221,7 @@ func prepareEnv(ctx context.Context) (*workspace, error) {
 
 func createCloudInitISO(ctx context.Context, instanceDir string, userData, metaData []byte) error {
 	isoPath := path.Join(instanceDir, "config.iso")
-	return qemu.CreateCloudInitISO(ctx, instanceDir, isoPath, userData, metaData)
+	return qemu.CreateCloudInitISO(ctx, instanceDir, isoPath, userData, metaData, nil)
 }
 
 func downloadFN(ws *workspace, URL, location string) string {
