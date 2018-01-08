@@ -32,3 +32,7 @@
 [[constraint]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
+
+[[constraint]]
+  name = "github.com/spf13/cobra"
+  revision = "7b2c5ac9fc04fc5efafb60700713d4fa609b777b"
