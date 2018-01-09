@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package main
+package ccvm
 
 import (
 	"bytes"
@@ -27,6 +27,13 @@ import (
 	"text/template"
 
 	yaml "gopkg.in/yaml.v2"
+)
+
+// Different types of virtual development environments
+// we support.
+const (
+	CIAO            = "ciao"
+	CLEARCONTAINERS = "clearcontainers"
 )
 
 // Constants for the Guest image used by ccloudvm

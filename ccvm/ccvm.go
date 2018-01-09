@@ -1,4 +1,4 @@
-/*
+//
 // Copyright (c) 2016 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,15 +12,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-*/
+//
 
-/* TODO
-
-5. Install kernel
-12. Make most output from osprepare optional
-*/
-
-package main
+package ccvm
 
 import (
 	"context"
@@ -29,34 +23,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
-
-// Different types of virtual development environments
-// we support.
-const (
-	CIAO            = "ciao"
-	CLEARCONTAINERS = "clearcontainers"
-)
-
-func init() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "%s [create|start|stop|quit|status|connect|delete]\n\n", os.Args[0])
-		fmt.Fprintln(os.Stderr, "- create : creates a new VM")
-		fmt.Fprintln(os.Stderr, "- start : boots a stopped VM")
-		fmt.Fprintln(os.Stderr, "- stop : cleanly powers down a running VM")
-		fmt.Fprintln(os.Stderr, "- quit : quits a running VM")
-		fmt.Fprintln(os.Stderr, "- status : prints status information about the ccloudvm VM")
-		fmt.Fprintln(os.Stderr, "- connect : connects to the VM via SSH")
-		fmt.Fprintln(os.Stderr, "- delete : shuts down and deletes the VM")
-	}
-}
 
 type mounts []mount
 
@@ -269,7 +241,8 @@ func startFlags(in *VMSpec) error {
 	return nil
 }
 
-func create(ctx context.Context, errCh chan error) {
+// Create sets up the VM
+func Create(ctx context.Context, errCh chan error) {
 	var err error
 
 	defer func() {
@@ -355,7 +328,8 @@ func create(ctx context.Context, errCh chan error) {
 	fmt.Println("Type ccloudvm connect to start using it.")
 }
 
-func start(ctx context.Context, errCh chan error) {
+// Start launches the VM
+func Start(ctx context.Context, errCh chan error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		errCh <- err
@@ -405,7 +379,8 @@ func start(ctx context.Context, errCh chan error) {
 	errCh <- err
 }
 
-func stop(ctx context.Context, errCh chan error) {
+// Stop requests the VM shuts down cleanly
+func Stop(ctx context.Context, errCh chan error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		errCh <- err
@@ -423,7 +398,8 @@ func stop(ctx context.Context, errCh chan error) {
 	errCh <- err
 }
 
-func quit(ctx context.Context, errCh chan error) {
+// Quit forceably kills VM
+func Quit(ctx context.Context, errCh chan error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		errCh <- err
@@ -441,7 +417,8 @@ func quit(ctx context.Context, errCh chan error) {
 	errCh <- err
 }
 
-func status(ctx context.Context, errCh chan error) {
+// Status prints out VM information
+func Status(ctx context.Context, errCh chan error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		errCh <- err
@@ -466,7 +443,8 @@ func status(ctx context.Context, errCh chan error) {
 	errCh <- err
 }
 
-func connect(ctx context.Context, errCh chan error) {
+// Connect to the VM via SSH
+func Connect(ctx context.Context, errCh chan error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		errCh <- err
@@ -523,7 +501,8 @@ func connect(ctx context.Context, errCh chan error) {
 	errCh <- err
 }
 
-func delete(ctx context.Context, errCh chan error) {
+// Delete the VM
+func Delete(ctx context.Context, errCh chan error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		errCh <- err
@@ -538,55 +517,4 @@ func delete(ctx context.Context, errCh chan error) {
 	}
 
 	errCh <- nil
-}
-
-func runCommand(signalCh <-chan os.Signal) error {
-	var err error
-
-	errCh := make(chan error)
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	switch os.Args[1] {
-	case "create":
-		go create(ctx, errCh)
-	case "start":
-		go start(ctx, errCh)
-	case "stop":
-		go stop(ctx, errCh)
-	case "quit":
-		go quit(ctx, errCh)
-	case "status":
-		go status(ctx, errCh)
-	case "connect":
-		go connect(ctx, errCh)
-	case "delete":
-		go delete(ctx, errCh)
-	}
-	select {
-	case <-signalCh:
-		cancelFunc()
-		err = <-errCh
-	case err = <-errCh:
-		cancelFunc()
-	}
-
-	return err
-}
-
-func main() {
-	flag.Parse()
-	if len(os.Args) < 2 ||
-		!(os.Args[1] == "create" || os.Args[1] == "start" || os.Args[1] == "stop" ||
-			os.Args[1] == "quit" || os.Args[1] == "status" ||
-			os.Args[1] == "connect" || os.Args[1] == "delete") {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-
-	if err := runCommand(signalCh); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
 }

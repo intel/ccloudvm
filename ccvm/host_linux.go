@@ -14,7 +14,7 @@
 //
 // +build linux
 
-package main
+package ccvm
 
 import "github.com/ciao-project/ciao/deviceinfo"
 

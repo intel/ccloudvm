@@ -15,7 +15,7 @@
 //
 // +build !linux
 
-package main
+package ccvm
 
 func getMemAndCpus() (mem int, cpus int) {
 	return 4, 2
