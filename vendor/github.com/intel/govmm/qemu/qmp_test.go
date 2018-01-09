@@ -22,13 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"context"
-
-	"github.com/ciao-project/ciao/testutil"
 )
 
 const (
@@ -75,7 +74,7 @@ type qmpTestEvent struct {
 
 type qmpTestResult struct {
 	result string
-	data   map[string]interface{}
+	data   interface{}
 }
 
 type qmpTestCommandBuffer struct {
@@ -132,11 +131,8 @@ func (b *qmpTestCommandBuffer) startEventLoop(wg *sync.WaitGroup) {
 }
 
 func (b *qmpTestCommandBuffer) AddCommand(name string, args map[string]interface{},
-	result string, data map[string]interface{}) {
+	result string, data interface{}) {
 	b.cmds = append(b.cmds, qmpTestCommand{name, args})
-	if data == nil {
-		data = make(map[string]interface{})
-	}
 	b.results = append(b.results, qmpTestResult{result, data})
 }
 
@@ -360,7 +356,7 @@ func TestQMPBlockdevAdd(t *testing.T) {
 	q := startQMPLoop(buf, cfg, connectedCh, disconnectedCh)
 	q.version = checkVersion(t, connectedCh)
 	err := q.ExecuteBlockdevAdd(context.Background(), "/dev/rbd0",
-		fmt.Sprintf("drive_%s", testutil.VolumeUUID))
+		fmt.Sprintf("drive_%s", volumeUUID))
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -382,8 +378,8 @@ func TestQMPDeviceAdd(t *testing.T) {
 	cfg := QMPConfig{Logger: qmpTestLogger{}}
 	q := startQMPLoop(buf, cfg, connectedCh, disconnectedCh)
 	checkVersion(t, connectedCh)
-	blockdevID := fmt.Sprintf("drive_%s", testutil.VolumeUUID)
-	devID := fmt.Sprintf("device_%s", testutil.VolumeUUID)
+	blockdevID := fmt.Sprintf("drive_%s", volumeUUID)
+	devID := fmt.Sprintf("device_%s", volumeUUID)
 	err := q.ExecuteDeviceAdd(context.Background(), blockdevID, devID,
 		"virtio-blk-pci", "")
 	if err != nil {
@@ -408,7 +404,7 @@ func TestQMPXBlockdevDel(t *testing.T) {
 	q := startQMPLoop(buf, cfg, connectedCh, disconnectedCh)
 	q.version = checkVersion(t, connectedCh)
 	err := q.ExecuteBlockdevDel(context.Background(),
-		fmt.Sprintf("drive_%s", testutil.VolumeUUID))
+		fmt.Sprintf("drive_%s", volumeUUID))
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -429,7 +425,7 @@ func TestQMPDeviceDel(t *testing.T) {
 		seconds         = 1352167040730
 		microsecondsEv1 = 123456
 		microsecondsEv2 = 123556
-		device          = "device_" + testutil.VolumeUUID
+		device          = "device_" + volumeUUID
 		path            = "/dev/rbd0"
 	)
 
@@ -472,7 +468,7 @@ func TestQMPDeviceDel(t *testing.T) {
 	checkVersion(t, connectedCh)
 	buf.startEventLoop(&wg)
 	err := q.ExecuteDeviceDel(context.Background(),
-		fmt.Sprintf("device_%s", testutil.VolumeUUID))
+		fmt.Sprintf("device_%s", volumeUUID))
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -501,7 +497,7 @@ func TestQMPDeviceDelTimeout(t *testing.T) {
 	checkVersion(t, connectedCh)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	err := q.ExecuteDeviceDel(ctx,
-		fmt.Sprintf("device_%s", testutil.VolumeUUID))
+		fmt.Sprintf("device_%s", volumeUUID))
 	cancel()
 	if err != context.DeadlineExceeded {
 		t.Fatalf("Timeout expected found %v", err)
@@ -685,7 +681,7 @@ func TestQMPEvents(t *testing.T) {
 		seconds         = 1352167040730
 		microsecondsEv1 = 123456
 		microsecondsEv2 = 123556
-		device          = "device_" + testutil.VolumeUUID
+		device          = "device_" + volumeUUID
 		path            = "/dev/rbd0"
 	)
 	var wg sync.WaitGroup
@@ -723,7 +719,7 @@ func TestQMPEvents(t *testing.T) {
 	deviceName := ev.Data["device"].(string)
 	if deviceName != device {
 		t.Errorf("Unexpected device field.  Expected %s, found %s",
-			"device_"+testutil.VolumeUUID, device)
+			"device_"+volumeUUID, device)
 	}
 	pathName := ev.Data["path"].(string)
 	if pathName != path {
@@ -784,4 +780,85 @@ func TestQMPLostLoop(t *testing.T) {
 	if err == nil {
 		t.Error("Expected executeQMPCapabilities to fail")
 	}
+}
+
+// Checks that PCI devices are correctly added using device_add.
+//
+// We start a QMPLoop, send the device_add command and stop the loop.
+//
+// The device_add command should be correctly sent and the QMP loop should
+// exit gracefully.
+func TestQMPPCIDeviceAdd(t *testing.T) {
+	connectedCh := make(chan *QMPVersion)
+	disconnectedCh := make(chan struct{})
+	buf := newQMPTestCommandBuffer(t)
+	buf.AddCommand("device_add", nil, "return", nil)
+	cfg := QMPConfig{Logger: qmpTestLogger{}}
+	q := startQMPLoop(buf, cfg, connectedCh, disconnectedCh)
+	checkVersion(t, connectedCh)
+	blockdevID := fmt.Sprintf("drive_%s", volumeUUID)
+	devID := fmt.Sprintf("device_%s", volumeUUID)
+	err := q.ExecutePCIDeviceAdd(context.Background(), blockdevID, devID,
+		"virtio-blk-pci", "0x1", "")
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	q.Shutdown()
+	<-disconnectedCh
+}
+
+// Checks that CPU are correctly added using device_add
+func TestQMPCPUDeviceAdd(t *testing.T) {
+	connectedCh := make(chan *QMPVersion)
+	disconnectedCh := make(chan struct{})
+	buf := newQMPTestCommandBuffer(t)
+	buf.AddCommand("device_add", nil, "return", nil)
+	cfg := QMPConfig{Logger: qmpTestLogger{}}
+	q := startQMPLoop(buf, cfg, connectedCh, disconnectedCh)
+	checkVersion(t, connectedCh)
+	driver := "qemu64-x86_64-cpu"
+	cpuID := "cpu-0"
+	socketID := "0"
+	coreID := "1"
+	threadID := "0"
+	err := q.ExecuteCPUDeviceAdd(context.Background(), driver, cpuID, socketID, coreID, threadID)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	q.Shutdown()
+	<-disconnectedCh
+}
+
+// Checks that hotpluggable CPUs are listed correctly
+func TestQMPExecuteQueryHotpluggableCPUs(t *testing.T) {
+	connectedCh := make(chan *QMPVersion)
+	disconnectedCh := make(chan struct{})
+	buf := newQMPTestCommandBuffer(t)
+	hotCPU := HotpluggableCPU{
+		Type:       "host-x86",
+		VcpusCount: 5,
+		Properties: CPUProperties{
+			Node:   1,
+			Socket: 3,
+			Core:   2,
+			Thread: 4,
+		},
+		QOMPath: "/abc/123/rgb",
+	}
+	buf.AddCommand("query-hotpluggable-cpus", nil, "return", []interface{}{hotCPU})
+	cfg := QMPConfig{Logger: qmpTestLogger{}}
+	q := startQMPLoop(buf, cfg, connectedCh, disconnectedCh)
+	checkVersion(t, connectedCh)
+	hotCPUs, err := q.ExecuteQueryHotpluggableCPUs(context.Background())
+	if err != nil {
+		t.Fatalf("Unexpected error: %v\n", err)
+	}
+	if len(hotCPUs) != 1 {
+		t.Fatalf("Expected hot CPUs length equals to 1\n")
+	}
+	if reflect.DeepEqual(hotCPUs[0], hotCPU) == false {
+		t.Fatalf("Expected %v equals to %v\n", hotCPUs[0], hotCPU)
+	}
+	q.Shutdown()
+	<-disconnectedCh
 }

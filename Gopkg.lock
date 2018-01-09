@@ -3,24 +3,29 @@
 
 [[projects]]
   name = "github.com/ciao-project/ciao"
-  packages = ["clogger","deviceinfo","osprepare","qemu","uuid"]
-  revision = "60525fba8e5f4f1bf3ad02b8f5854c4dcf735a78"
+  packages = ["clogger","deviceinfo","osprepare","uuid"]
+  revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/intel/govmm"
+  packages = ["qemu"]
+  revision = "22c99930c2f69fff02926e90803e4a7168d08240"
 
 [[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
-  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
 
 [[projects]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
+  revision = "1244d3ce02e3e1c16820ada0bae506b6c479f106"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e77d825c83d41d01f513cb4f6035c4d2ffaf7920793956fd1902f1b928e51d61"
+  inputs-digest = "b1733143571f6b77c233fa2a63490ddcb37a1fd63a39092a3183be0c67637d79"
   solver-name = "gps-cdcl"
   solver-version = 1

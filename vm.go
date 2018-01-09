@@ -30,7 +30,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/ciao-project/ciao/qemu"
+	"github.com/intel/govmm/qemu"
 )
 
 // Download Parameters
@@ -105,7 +105,7 @@ func bootVM(ctx context.Context, ws *workspace, in *VMSpec) error {
 
 	args = append(args, "-display", "none", "-vga", "none")
 
-	output, err := qemu.LaunchCustomQemu(ctx, "", args, nil, nil)
+	output, err := qemu.LaunchCustomQemu(ctx, "", args, nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("Failed to launch qemu : %v, %s", err, output)
 	}
