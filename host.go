@@ -15,7 +15,7 @@
 //
 // +build !linux
 
-package main
+package ccloudvm
 
 func getMemAndCpus() (mem int, cpus int) {
 	return 4, 2

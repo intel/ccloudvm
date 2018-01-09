@@ -20,16 +20,14 @@
 12. Make most output from osprepare optional
 */
 
-package main
+package ccloudvm
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"strconv"
 	"strings"
@@ -43,20 +41,6 @@ const (
 	CIAO            = "ciao"
 	CLEARCONTAINERS = "clearcontainers"
 )
-
-func init() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "%s [create|start|stop|quit|status|connect|delete]\n\n", os.Args[0])
-		fmt.Fprintln(os.Stderr, "- create : creates a new VM")
-		fmt.Fprintln(os.Stderr, "- start : boots a stopped VM")
-		fmt.Fprintln(os.Stderr, "- stop : cleanly powers down a running VM")
-		fmt.Fprintln(os.Stderr, "- quit : quits a running VM")
-		fmt.Fprintln(os.Stderr, "- status : prints status information about the ccloudvm VM")
-		fmt.Fprintln(os.Stderr, "- connect : connects to the VM via SSH")
-		fmt.Fprintln(os.Stderr, "- delete : shuts down and deletes the VM")
-	}
-}
 
 type mounts []mount
 
@@ -103,20 +87,6 @@ func (p *ports) Set(value string) error {
 	return nil
 }
 
-type packageUpgrade string
-
-func (p *packageUpgrade) String() string {
-	return string(*p)
-}
-
-func (p *packageUpgrade) Set(value string) error {
-	if value != "true" && value != "false" {
-		return fmt.Errorf("--package-update parameter should be true or false")
-	}
-	*p = packageUpgrade(value)
-	return nil
-}
-
 type drives []drive
 
 func (d *drives) String() string {
@@ -140,13 +110,14 @@ func (d *drives) Set(value string) error {
 	return nil
 }
 
-func vmFlags(fs *flag.FlagSet, memGB, CPUs *int, m *mounts, p *ports, d *drives, qemuport *uint) {
-	fs.IntVar(memGB, "mem", *memGB, "Gigabytes of RAM allocated to VM")
-	fs.IntVar(CPUs, "cpus", *CPUs, "VCPUs assigned to VM")
-	fs.Var(m, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
-	fs.Var(d, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
-	fs.Var(p, "port", "port mapping. Format is host_port-guest_port, e.g., -port 10022-22")
-	fs.UintVar(qemuport, "qemuport", *qemuport, "Port to follow qemu logs of the guest machine, eg., --qemuport=9999")
+// VMFlags populates the provided FlagSet with common flags for start and create
+func VMFlags(fs *flag.FlagSet, spec *VMSpec) {
+	fs.IntVar(&spec.MemGiB, "mem", 0, "Gigabytes of RAM allocated to VM")
+	fs.IntVar(&spec.CPUs, "cpus", 0, "VCPUs assigned to VM")
+	fs.Var(&spec.Mounts, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
+	fs.Var(&spec.Drives, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
+	fs.Var(&spec.PortMappings, "port", "port mapping. Format is host_port-guest_port, e.g., -port 10022-22")
+	fs.UintVar(&spec.Qemuport, "qemuport", 0, "Port to follow qemu logs of the guest machine, eg., --qemuport=9999")
 }
 
 func checkDirectory(dir string) error {
@@ -170,38 +141,9 @@ func checkDirectory(dir string) error {
 	return nil
 }
 
-func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
-	var debug bool
-	var m mounts
-	var p ports
-	var d drives
-	var memGiB, CPUs int
-	var qemuport uint
-	var update packageUpgrade
-
-	fs := flag.NewFlagSet("create", flag.ExitOnError)
-	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s create <workload> \n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  <workload>\tName of the workload to create\n\n")
-		fs.PrintDefaults()
-	}
-	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d, &qemuport)
-	fs.BoolVar(&debug, "debug", false, "Enables debug mode")
-	fs.Var(&update, "package-upgrade",
-		"Hint to enable or disable update of VM packages. Should be true or false")
-
-	if err := fs.Parse(flag.Args()[1:]); err != nil {
-		return nil, false, err
-	}
-
-	if fs.NArg() != 1 {
-		fs.Usage()
-		return nil, false, errors.New("no workload specified")
-	}
-	workloadName := fs.Arg(0)
-
-	for i := range m {
-		if err := checkDirectory(m[i].Path); err != nil {
+func prepareCreate(ctx context.Context, ws *workspace, workloadName string, customSpec *VMSpec, debug bool, packageUpgrade bool) (*workload, bool, error) {
+	for i := range customSpec.Mounts {
+		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
 			return nil, false, err
 		}
 	}
@@ -212,19 +154,19 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	}
 
 	in := &wkl.spec.VM
-	if memGiB != 0 {
-		in.MemGiB = memGiB
+	if customSpec.MemGiB != 0 {
+		in.MemGiB = customSpec.MemGiB
 	}
-	if CPUs != 0 {
-		in.CPUs = CPUs
+	if customSpec.CPUs != 0 {
+		in.CPUs = customSpec.CPUs
 	}
-	if qemuport != 0 {
-		in.Qemuport = qemuport
+	if customSpec.Qemuport != 0 {
+		in.Qemuport = customSpec.Qemuport
 	}
 
-	in.mergeMounts(m)
-	in.mergePorts(p)
-	in.mergeDrives(d)
+	in.mergeMounts(customSpec.Mounts)
+	in.mergePorts(customSpec.PortMappings)
+	in.mergeDrives(customSpec.Drives)
 
 	ws.Mounts = in.Mounts
 	ws.Hostname = wkl.spec.Hostname
@@ -233,69 +175,62 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
 		ws.NoProxy = ws.Hostname
 	}
-	ws.PackageUpgrade = string(update)
+
+	ws.PackageUpgrade = "false"
+	if packageUpgrade {
+		ws.PackageUpgrade = "true"
+	}
 
 	return wkl, debug, nil
 }
 
-func startFlags(in *VMSpec) error {
-	var m mounts
-	var p ports
-	var d drives
-
-	CPUs := in.CPUs
-	memGiB := in.MemGiB
-	qemuport := in.Qemuport
-
-	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d, &qemuport)
-	if err := fs.Parse(flag.Args()[1:]); err != nil {
-		return err
-	}
-
-	for i := range m {
-		if err := checkDirectory(m[i].Path); err != nil {
+func prepareStart(in *VMSpec, customSpec *VMSpec) error {
+	for i := range customSpec.Mounts {
+		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
 			return err
 		}
 	}
 
-	in.CPUs = CPUs
-	in.MemGiB = memGiB
-	in.Qemuport = qemuport
-	in.mergeMounts(m)
-	in.mergePorts(p)
-	in.mergeDrives(d)
+	if customSpec.MemGiB != 0 {
+		in.MemGiB = customSpec.MemGiB
+	}
+	if customSpec.CPUs != 0 {
+		in.CPUs = customSpec.CPUs
+	}
+	if customSpec.Qemuport != 0 {
+		in.Qemuport = customSpec.Qemuport
+	}
+
+	in.mergeMounts(customSpec.Mounts)
+	in.mergePorts(customSpec.PortMappings)
+	in.mergeDrives(customSpec.Drives)
 
 	return nil
 }
 
-func create(ctx context.Context, errCh chan error) {
+// Create creates the desired VM using the provided parameters
+func Create(ctx context.Context, workloadName string, customSpec *VMSpec, debug bool, packageUpgrade bool) error {
 	var err error
-
-	defer func() {
-		errCh <- err
-	}()
 
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
-	wkld, debug, err := createFlags(ctx, ws)
+	wkld, debug, err := prepareCreate(ctx, ws, workloadName, customSpec, debug, packageUpgrade)
 	if err != nil {
-		return
+		return err
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		err = fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
-		return
+		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
 	in := &wkld.spec.VM
 	_, err = os.Stat(ws.instanceDir)
 	if err == nil {
-		err = fmt.Errorf("instance already exists")
-		return
+		return fmt.Errorf("instance already exists")
+
 	}
 
 	fmt.Println("Installing host dependencies")
@@ -303,8 +238,7 @@ func create(ctx context.Context, errCh chan error) {
 
 	err = os.MkdirAll(ws.instanceDir, 0755)
 	if err != nil {
-		err = fmt.Errorf("unable to create cache dir: %v", err)
-		return
+		return fmt.Errorf("unable to create cache dir: %v", err)
 	}
 
 	defer func() {
@@ -315,57 +249,58 @@ func create(ctx context.Context, errCh chan error) {
 
 	err = wkld.save(ws)
 	if err != nil {
-		err = fmt.Errorf("Unable to save instance state : %v", err)
-		return
+		return fmt.Errorf("Unable to save instance state : %v", err)
 	}
 
 	err = prepareSSHKeys(ctx, ws)
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
 	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ccvmDir, downloadProgress)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = buildISOImage(ctx, ws.instanceDir, wkld.userData, ws, debug)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = createRootfs(ctx, qcowPath, ws.instanceDir)
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", in.MemGiB, in.CPUs)
 
 	err = bootVM(ctx, ws, in)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = manageInstallation(ctx, ws.ccvmDir, ws.instanceDir, ws)
 	if err != nil {
-		return
+		return err
 	}
+
 	fmt.Println("VM successfully created!")
 	fmt.Println("Type ccloudvm connect to start using it.")
+
+	return nil
 }
 
-func start(ctx context.Context, errCh chan error) {
+// Start the VM
+func Start(ctx context.Context, customSpec *VMSpec) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 	in := &wkld.spec.VM
 
@@ -377,15 +312,13 @@ func start(ctx context.Context, errCh chan error) {
 		in.CPUs = CPUs
 	}
 
-	err = startFlags(in)
+	err = prepareStart(in, customSpec)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		errCh <- fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
-		return
+		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
 	if err := wkld.save(ws); err != nil {
@@ -396,100 +329,92 @@ func start(ctx context.Context, errCh chan error) {
 
 	err = bootVM(ctx, ws, in)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fmt.Println("VM Started")
 
-	errCh <- err
+	return nil
 }
 
-func stop(ctx context.Context, errCh chan error) {
+// Stop the VM (cleanly)
+func Stop(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	err = stopVM(ctx, ws.instanceDir)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fmt.Println("VM Stopped")
 
-	errCh <- err
+	return nil
 }
 
-func quit(ctx context.Context, errCh chan error) {
+// Quit the VM (forceably)
+func Quit(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	err = quitVM(ctx, ws.instanceDir)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fmt.Println("VM Quit")
 
-	errCh <- err
+	return nil
 }
 
-func status(ctx context.Context, errCh chan error) {
+// Status returns information about the VM
+func Status(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		errCh <- fmt.Errorf("Unable to load instance state: %v", err)
-		return
+		return fmt.Errorf("Unable to load instance state: %v", err)
 	}
 	in := &wkld.spec.VM
 
 	sshPort, err := in.sshPort()
 	if err != nil {
-		errCh <- fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
-		return
+		return fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
 	}
 
 	statusVM(ctx, ws.instanceDir, ws.keyPath, wkld.spec.WorkloadName,
 		sshPort, in.Qemuport)
-	errCh <- err
+	return nil
 }
 
-func connect(ctx context.Context, errCh chan error) {
+// Connect starts an SSH session to the VM
+func Connect(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		errCh <- fmt.Errorf("Unable to load instance state: %v", err)
-		return
+		return fmt.Errorf("Unable to load instance state: %v", err)
 	}
 	in := &wkld.spec.VM
 
 	path, err := exec.LookPath("ssh")
 	if err != nil {
-		errCh <- fmt.Errorf("Unable to locate ssh binary")
-		return
+		return fmt.Errorf("Unable to locate ssh binary")
 	}
 
 	sshPort, err := in.sshPort()
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	if !sshReady(ctx, sshPort) {
@@ -499,8 +424,7 @@ func connect(ctx context.Context, errCh chan error) {
 			select {
 			case <-time.After(time.Second):
 			case <-ctx.Done():
-				errCh <- fmt.Errorf("Cancelled")
-				return
+				return fmt.Errorf("Cancelled")
 			}
 
 			if sshReady(ctx, sshPort) {
@@ -520,73 +444,21 @@ func connect(ctx context.Context, errCh chan error) {
 		"-i", ws.keyPath,
 		"127.0.0.1", "-p", strconv.Itoa(sshPort)},
 		os.Environ())
-	errCh <- err
+	return err
 }
 
-func delete(ctx context.Context, errCh chan error) {
+// Delete quits and then removes the VM
+func Delete(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	_ = quitVM(ctx, ws.instanceDir)
 	err = os.RemoveAll(ws.instanceDir)
 	if err != nil {
-		errCh <- fmt.Errorf("unable to delete instance: %v", err)
-		return
+		return fmt.Errorf("unable to delete instance: %v", err)
 	}
 
-	errCh <- nil
-}
-
-func runCommand(signalCh <-chan os.Signal) error {
-	var err error
-
-	errCh := make(chan error)
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	switch os.Args[1] {
-	case "create":
-		go create(ctx, errCh)
-	case "start":
-		go start(ctx, errCh)
-	case "stop":
-		go stop(ctx, errCh)
-	case "quit":
-		go quit(ctx, errCh)
-	case "status":
-		go status(ctx, errCh)
-	case "connect":
-		go connect(ctx, errCh)
-	case "delete":
-		go delete(ctx, errCh)
-	}
-	select {
-	case <-signalCh:
-		cancelFunc()
-		err = <-errCh
-	case err = <-errCh:
-		cancelFunc()
-	}
-
-	return err
-}
-
-func main() {
-	flag.Parse()
-	if len(os.Args) < 2 ||
-		!(os.Args[1] == "create" || os.Args[1] == "start" || os.Args[1] == "stop" ||
-			os.Args[1] == "quit" || os.Args[1] == "status" ||
-			os.Args[1] == "connect" || os.Args[1] == "delete") {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-
-	if err := runCommand(signalCh); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
+	return nil
 }

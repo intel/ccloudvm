@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package main
+package ccloudvm
 
 import (
 	"bytes"
@@ -68,12 +68,12 @@ func (d drive) String() string {
 
 // VMSpec holds the per-VM state.
 type VMSpec struct {
-	MemGiB       int           `yaml:"mem_gib"`
-	CPUs         int           `yaml:"cpus"`
-	PortMappings []portMapping `yaml:"ports"`
-	Mounts       []mount       `yaml:"mounts"`
-	Drives       []drive       `yaml:"drives"`
-	Qemuport     uint          `yaml:"qemuport"`
+	MemGiB       int    `yaml:"mem_gib"`
+	CPUs         int    `yaml:"cpus"`
+	PortMappings ports  `yaml:"ports"`
+	Mounts       mounts `yaml:"mounts"`
+	Drives       drives `yaml:"drives"`
+	Qemuport     uint   `yaml:"qemuport"`
 }
 
 type workloadSpec struct {
