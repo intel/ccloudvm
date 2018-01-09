@@ -47,36 +47,45 @@ func init() {
 	}
 }
 
-func runCommand(signalCh <-chan os.Signal) error {
+func runCommand(ctx context.Context) error {
 	var err error
 
-	errCh := make(chan error)
-	ctx, cancelFunc := context.WithCancel(context.Background())
 	switch os.Args[1] {
 	case "create":
-		go ccvm.Create(ctx, errCh)
+		err = ccvm.Create(ctx)
 	case "start":
-		go ccvm.Start(ctx, errCh)
+		err = ccvm.Start(ctx)
 	case "stop":
-		go ccvm.Stop(ctx, errCh)
+		err = ccvm.Stop(ctx)
 	case "quit":
-		go ccvm.Quit(ctx, errCh)
+		err = ccvm.Quit(ctx)
 	case "status":
-		go ccvm.Status(ctx, errCh)
+		err = ccvm.Status(ctx)
 	case "connect":
-		go ccvm.Connect(ctx, errCh)
+		err = ccvm.Connect(ctx)
 	case "delete":
-		go ccvm.Delete(ctx, errCh)
-	}
-	select {
-	case <-signalCh:
-		cancelFunc()
-		err = <-errCh
-	case err = <-errCh:
-		cancelFunc()
+		err = ccvm.Delete(ctx)
 	}
 
 	return err
+}
+
+func getSignalContext() (context.Context, context.CancelFunc) {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	sigCh := make(chan os.Signal, 1)
+	go func() {
+		for {
+			select {
+			case <-sigCh:
+				cancelFunc()
+			case <-ctx.Done():
+				break
+			}
+		}
+	}()
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	return ctx, cancelFunc
 }
 
 func main() {
@@ -89,10 +98,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	ctx, cancelFunc := getSignalContext()
+	defer cancelFunc()
 
-	if err := runCommand(signalCh); err != nil {
+	if err := runCommand(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

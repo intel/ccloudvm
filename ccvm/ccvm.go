@@ -242,33 +242,27 @@ func startFlags(in *VMSpec) error {
 }
 
 // Create sets up the VM
-func Create(ctx context.Context, errCh chan error) {
+func Create(ctx context.Context) error {
 	var err error
-
-	defer func() {
-		errCh <- err
-	}()
 
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
 	wkld, debug, err := createFlags(ctx, ws)
 	if err != nil {
-		return
+		return err
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		err = fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
-		return
+		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
 	in := &wkld.spec.VM
 	_, err = os.Stat(ws.instanceDir)
 	if err == nil {
-		err = fmt.Errorf("instance already exists")
-		return
+		return fmt.Errorf("instance already exists")
 	}
 
 	fmt.Println("Installing host dependencies")
@@ -276,8 +270,7 @@ func Create(ctx context.Context, errCh chan error) {
 
 	err = os.MkdirAll(ws.instanceDir, 0755)
 	if err != nil {
-		err = fmt.Errorf("unable to create cache dir: %v", err)
-		return
+		return fmt.Errorf("unable to create cache dir: %v", err)
 	}
 
 	defer func() {
@@ -288,58 +281,58 @@ func Create(ctx context.Context, errCh chan error) {
 
 	err = wkld.save(ws)
 	if err != nil {
-		err = fmt.Errorf("Unable to save instance state : %v", err)
-		return
+		return fmt.Errorf("Unable to save instance state : %v", err)
 	}
 
 	err = prepareSSHKeys(ctx, ws)
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
 	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ccvmDir, downloadProgress)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = buildISOImage(ctx, ws.instanceDir, wkld.userData, ws, debug)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = createRootfs(ctx, qcowPath, ws.instanceDir)
 	if err != nil {
-		return
+		return err
 	}
 
 	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", in.MemGiB, in.CPUs)
 
 	err = bootVM(ctx, ws, in)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = manageInstallation(ctx, ws.ccvmDir, ws.instanceDir, ws)
 	if err != nil {
-		return
+		return err
 	}
+
 	fmt.Println("VM successfully created!")
 	fmt.Println("Type ccloudvm connect to start using it.")
+
+	return nil
 }
 
 // Start launches the VM
-func Start(ctx context.Context, errCh chan error) {
+func Start(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 	in := &wkld.spec.VM
 
@@ -353,13 +346,11 @@ func Start(ctx context.Context, errCh chan error) {
 
 	err = startFlags(in)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		errCh <- fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
-		return
+		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
 	if err := wkld.save(ws); err != nil {
@@ -370,104 +361,92 @@ func Start(ctx context.Context, errCh chan error) {
 
 	err = bootVM(ctx, ws, in)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fmt.Println("VM Started")
 
-	errCh <- err
+	return nil
 }
 
 // Stop requests the VM shuts down cleanly
-func Stop(ctx context.Context, errCh chan error) {
+func Stop(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	err = stopVM(ctx, ws.instanceDir)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fmt.Println("VM Stopped")
 
-	errCh <- err
+	return nil
 }
 
 // Quit forceably kills VM
-func Quit(ctx context.Context, errCh chan error) {
+func Quit(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	err = quitVM(ctx, ws.instanceDir)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fmt.Println("VM Quit")
 
-	errCh <- err
+	return nil
 }
 
 // Status prints out VM information
-func Status(ctx context.Context, errCh chan error) {
+func Status(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		errCh <- fmt.Errorf("Unable to load instance state: %v", err)
-		return
+		return fmt.Errorf("Unable to load instance state: %v", err)
 	}
 	in := &wkld.spec.VM
 
 	sshPort, err := in.sshPort()
 	if err != nil {
-		errCh <- fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
-		return
+		return fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
 	}
 
 	statusVM(ctx, ws.instanceDir, ws.keyPath, wkld.spec.WorkloadName,
 		sshPort, in.Qemuport)
-	errCh <- err
+	return nil
 }
 
 // Connect to the VM via SSH
-func Connect(ctx context.Context, errCh chan error) {
+func Connect(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		errCh <- fmt.Errorf("Unable to load instance state: %v", err)
-		return
+		return fmt.Errorf("Unable to load instance state: %v", err)
 	}
 	in := &wkld.spec.VM
 
 	path, err := exec.LookPath("ssh")
 	if err != nil {
-		errCh <- fmt.Errorf("Unable to locate ssh binary")
-		return
+		return fmt.Errorf("Unable to locate ssh binary")
 	}
 
 	sshPort, err := in.sshPort()
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	if !sshReady(ctx, sshPort) {
@@ -477,8 +456,7 @@ func Connect(ctx context.Context, errCh chan error) {
 			select {
 			case <-time.After(time.Second):
 			case <-ctx.Done():
-				errCh <- fmt.Errorf("Cancelled")
-				return
+				return fmt.Errorf("Cancelled")
 			}
 
 			if sshReady(ctx, sshPort) {
@@ -498,23 +476,21 @@ func Connect(ctx context.Context, errCh chan error) {
 		"-i", ws.keyPath,
 		"127.0.0.1", "-p", strconv.Itoa(sshPort)},
 		os.Environ())
-	errCh <- err
+	return err
 }
 
 // Delete the VM
-func Delete(ctx context.Context, errCh chan error) {
+func Delete(ctx context.Context) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	_ = quitVM(ctx, ws.instanceDir)
 	err = os.RemoveAll(ws.instanceDir)
 	if err != nil {
-		errCh <- fmt.Errorf("unable to delete instance: %v", err)
-		return
+		return fmt.Errorf("unable to delete instance: %v", err)
 	}
 
-	errCh <- nil
+	return nil
 }
