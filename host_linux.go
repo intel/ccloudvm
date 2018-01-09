@@ -14,7 +14,7 @@
 //
 // +build linux
 
-package main
+package ccloudvm
 
 import "github.com/ciao-project/ciao/deviceinfo"
 

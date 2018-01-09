@@ -7,6 +7,11 @@
   revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
 
 [[projects]]
+  name = "github.com/inconshreveable/mousetrap"
+  packages = ["."]
+  revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
+
+[[projects]]
   branch = "master"
   name = "github.com/intel/govmm"
   packages = ["qemu"]
@@ -18,6 +23,18 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/spf13/cobra"
+  packages = ["."]
+  revision = "7b2c5ac9fc04fc5efafb60700713d4fa609b777b"
+  version = "v0.0.1"
+
+[[projects]]
+  name = "github.com/spf13/pflag"
+  packages = ["."]
+  revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -26,6 +43,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b1733143571f6b77c233fa2a63490ddcb37a1fd63a39092a3183be0c67637d79"
+  inputs-digest = "f255cc62a64134796489bca5c963684d8702223c0d87ed03fde22f5d98fcf165"
   solver-name = "gps-cdcl"
   solver-version = 1
