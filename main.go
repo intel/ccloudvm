@@ -48,26 +48,32 @@ func init() {
 }
 
 func runCommand(ctx context.Context) error {
-	var err error
-
 	switch os.Args[1] {
 	case "create":
-		err = ccvm.Create(ctx)
+		workloadName, debug, update, customSpec, err := ccvm.CreateFlags()
+		if err != nil {
+			return err
+		}
+		return ccvm.Create(ctx, workloadName, debug, update, &customSpec)
 	case "start":
-		err = ccvm.Start(ctx)
+		customSpec, err := ccvm.StartFlags()
+		if err != nil {
+			return err
+		}
+		return ccvm.Start(ctx, &customSpec)
 	case "stop":
-		err = ccvm.Stop(ctx)
+		return ccvm.Stop(ctx)
 	case "quit":
-		err = ccvm.Quit(ctx)
+		return ccvm.Quit(ctx)
 	case "status":
-		err = ccvm.Status(ctx)
+		return ccvm.Status(ctx)
 	case "connect":
-		err = ccvm.Connect(ctx)
+		return ccvm.Connect(ctx)
 	case "delete":
-		err = ccvm.Delete(ctx)
+		return ccvm.Delete(ctx)
 	}
 
-	return err
+	return nil
 }
 
 func getSignalContext() (context.Context, context.CancelFunc) {

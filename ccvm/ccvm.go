@@ -75,20 +75,6 @@ func (p *ports) Set(value string) error {
 	return nil
 }
 
-type packageUpgrade string
-
-func (p *packageUpgrade) String() string {
-	return string(*p)
-}
-
-func (p *packageUpgrade) Set(value string) error {
-	if value != "true" && value != "false" {
-		return fmt.Errorf("--package-update parameter should be true or false")
-	}
-	*p = packageUpgrade(value)
-	return nil
-}
-
 type drives []drive
 
 func (d *drives) String() string {
@@ -142,9 +128,10 @@ func checkDirectory(dir string) error {
 	return nil
 }
 
-func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
+// CreateFlags parses the flags to the create command
+func CreateFlags() (string, bool, bool, VMSpec, error) {
 	var debug bool
-	var update packageUpgrade
+	var update bool
 	var customSpec VMSpec
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 	fs.Usage = func() {
@@ -154,57 +141,37 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	}
 	vmFlags(fs, &customSpec)
 	fs.BoolVar(&debug, "debug", false, "Enables debug mode")
-	fs.Var(&update, "package-upgrade",
+	fs.BoolVar(&update, "package-upgrade", false,
 		"Hint to enable or disable update of VM packages. Should be true or false")
 
 	if err := fs.Parse(flag.Args()[1:]); err != nil {
-		return nil, false, err
+		return "", debug, update, customSpec, err
 	}
 
 	if fs.NArg() != 1 {
 		fs.Usage()
-		return nil, false, errors.New("no workload specified")
+		return "", debug, update, customSpec, errors.New("no workload specified")
 	}
 	workloadName := fs.Arg(0)
 
-	wkl, err := createWorkload(ctx, ws, workloadName)
-	if err != nil {
-		return nil, false, err
-	}
-
-	in := &wkl.spec.VM
-
-	err = in.mergeCustom(&customSpec)
-	if err != nil {
-		return nil, false, err
-	}
-
-	ws.Mounts = in.Mounts
-	ws.Hostname = wkl.spec.Hostname
-	if ws.NoProxy != "" {
-		ws.NoProxy = fmt.Sprintf("%s,%s", ws.Hostname, ws.NoProxy)
-	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
-		ws.NoProxy = ws.Hostname
-	}
-	ws.PackageUpgrade = string(update)
-
-	return wkl, debug, nil
+	return workloadName, debug, update, customSpec, nil
 }
 
-func startFlags(in *VMSpec) error {
-	customSpec := *in
+// StartFlags parsed the flags for the start command
+func StartFlags() (VMSpec, error) {
+	var customSpec VMSpec
 
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
 	vmFlags(fs, &customSpec)
 	if err := fs.Parse(flag.Args()[1:]); err != nil {
-		return err
+		return customSpec, err
 	}
 
-	return in.mergeCustom(&customSpec)
+	return customSpec, nil
 }
 
 // Create sets up the VM
-func Create(ctx context.Context) error {
+func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) error {
 	var err error
 
 	ws, err := prepareEnv(ctx)
@@ -212,16 +179,34 @@ func Create(ctx context.Context) error {
 		return err
 	}
 
-	wkld, debug, err := createFlags(ctx, ws)
+	wkld, err := createWorkload(ctx, ws, workloadName)
 	if err != nil {
 		return err
+	}
+
+	in := &wkld.spec.VM
+
+	err = in.mergeCustom(customSpec)
+	if err != nil {
+		return err
+	}
+
+	ws.Mounts = in.Mounts
+	ws.Hostname = wkld.spec.Hostname
+	if ws.NoProxy != "" {
+		ws.NoProxy = fmt.Sprintf("%s,%s", ws.Hostname, ws.NoProxy)
+	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
+		ws.NoProxy = ws.Hostname
+	}
+	ws.PackageUpgrade = "false"
+	if update {
+		ws.PackageUpgrade = "true"
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
 		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
-	in := &wkld.spec.VM
 	_, err = os.Stat(ws.instanceDir)
 	if err == nil {
 		return fmt.Errorf("instance already exists")
@@ -286,7 +271,7 @@ func Create(ctx context.Context) error {
 }
 
 // Start launches the VM
-func Start(ctx context.Context) error {
+func Start(ctx context.Context, customSpec *VMSpec) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		return err
@@ -298,17 +283,17 @@ func Start(ctx context.Context) error {
 	}
 	in := &wkld.spec.VM
 
+	err = in.mergeCustom(customSpec)
+	if err != nil {
+		return err
+	}
+
 	memGiB, CPUs := getMemAndCpus()
 	if in.MemGiB == 0 {
 		in.MemGiB = memGiB
 	}
 	if in.CPUs == 0 {
 		in.CPUs = CPUs
-	}
-
-	err = startFlags(in)
-	if err != nil {
-		return err
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
