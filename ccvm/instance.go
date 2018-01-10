@@ -249,6 +249,30 @@ func (in *VMSpec) mergeDrives(d drives) {
 	}
 }
 
+func (in *VMSpec) mergeCustom(customSpec *VMSpec) error {
+	for i := range customSpec.Mounts {
+		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
+			return err
+		}
+	}
+
+	if customSpec.MemGiB != 0 {
+		in.MemGiB = customSpec.MemGiB
+	}
+	if customSpec.CPUs != 0 {
+		in.CPUs = customSpec.CPUs
+	}
+	if customSpec.Qemuport != 0 {
+		in.Qemuport = customSpec.Qemuport
+	}
+
+	in.mergeMounts(customSpec.Mounts)
+	in.mergePorts(customSpec.PortMappings)
+	in.mergeDrives(customSpec.Drives)
+
+	return nil
+}
+
 func (in *VMSpec) sshPort() (int, error) {
 	for _, p := range in.PortMappings {
 		if p.Guest == 22 {

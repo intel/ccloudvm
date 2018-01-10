@@ -167,31 +167,17 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	}
 	workloadName := fs.Arg(0)
 
-	for i := range customSpec.Mounts {
-		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
-			return nil, false, err
-		}
-	}
-
 	wkl, err := createWorkload(ctx, ws, workloadName)
 	if err != nil {
 		return nil, false, err
 	}
 
 	in := &wkl.spec.VM
-	if customSpec.MemGiB != 0 {
-		in.MemGiB = customSpec.MemGiB
-	}
-	if customSpec.CPUs != 0 {
-		in.CPUs = customSpec.CPUs
-	}
-	if customSpec.Qemuport != 0 {
-		in.Qemuport = customSpec.Qemuport
-	}
 
-	in.mergeMounts(customSpec.Mounts)
-	in.mergePorts(customSpec.PortMappings)
-	in.mergeDrives(customSpec.Drives)
+	err = in.mergeCustom(&customSpec)
+	if err != nil {
+		return nil, false, err
+	}
 
 	ws.Mounts = in.Mounts
 	ws.Hostname = wkl.spec.Hostname
@@ -214,20 +200,7 @@ func startFlags(in *VMSpec) error {
 		return err
 	}
 
-	for i := range customSpec.Mounts {
-		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
-			return err
-		}
-	}
-
-	in.CPUs = customSpec.CPUs
-	in.MemGiB = customSpec.MemGiB
-	in.Qemuport = customSpec.Qemuport
-	in.mergeMounts(customSpec.Mounts)
-	in.mergePorts(customSpec.PortMappings)
-	in.mergeDrives(customSpec.Drives)
-
-	return nil
+	return in.mergeCustom(&customSpec)
 }
 
 // Create sets up the VM
