@@ -14,10 +14,24 @@
 // limitations under the License.
 */
 
-package main
+package cmd
 
-import "github.com/intel/ccloudvm/cmd"
+import (
+	"github.com/intel/ccloudvm/ccvm"
+	"github.com/spf13/cobra"
+)
 
-func main() {
-	cmd.Execute()
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Prints status information about a VM",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancelFunc := getSignalContext()
+		defer cancelFunc()
+
+		return ccvm.Status(ctx)
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(statusCmd)
 }

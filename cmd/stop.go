@@ -14,10 +14,24 @@
 // limitations under the License.
 */
 
-package main
+package cmd
 
-import "github.com/intel/ccloudvm/cmd"
+import (
+	"github.com/intel/ccloudvm/ccvm"
+	"github.com/spf13/cobra"
+)
 
-func main() {
-	cmd.Execute()
+var stopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Cleanly powers down a running VM",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancelFunc := getSignalContext()
+		defer cancelFunc()
+
+		return ccvm.Stop(ctx)
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(stopCmd)
 }

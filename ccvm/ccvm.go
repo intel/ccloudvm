@@ -18,7 +18,6 @@ package ccvm
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -98,7 +97,8 @@ func (d *drives) Set(value string) error {
 	return nil
 }
 
-func vmFlags(fs *flag.FlagSet, customSpec *VMSpec) {
+// VMFlags provides common flags for customising a workload
+func VMFlags(fs *flag.FlagSet, customSpec *VMSpec) {
 	fs.IntVar(&customSpec.MemGiB, "mem", customSpec.MemGiB, "Gigabytes of RAM allocated to VM")
 	fs.IntVar(&customSpec.CPUs, "cpus", customSpec.CPUs, "VCPUs assigned to VM")
 	fs.Var(&customSpec.Mounts, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
@@ -126,48 +126,6 @@ func checkDirectory(dir string) error {
 	}
 
 	return nil
-}
-
-// CreateFlags parses the flags to the create command
-func CreateFlags() (string, bool, bool, VMSpec, error) {
-	var debug bool
-	var update bool
-	var customSpec VMSpec
-	fs := flag.NewFlagSet("create", flag.ExitOnError)
-	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s create <workload> \n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  <workload>\tName of the workload to create\n\n")
-		fs.PrintDefaults()
-	}
-	vmFlags(fs, &customSpec)
-	fs.BoolVar(&debug, "debug", false, "Enables debug mode")
-	fs.BoolVar(&update, "package-upgrade", false,
-		"Hint to enable or disable update of VM packages. Should be true or false")
-
-	if err := fs.Parse(flag.Args()[1:]); err != nil {
-		return "", debug, update, customSpec, err
-	}
-
-	if fs.NArg() != 1 {
-		fs.Usage()
-		return "", debug, update, customSpec, errors.New("no workload specified")
-	}
-	workloadName := fs.Arg(0)
-
-	return workloadName, debug, update, customSpec, nil
-}
-
-// StartFlags parsed the flags for the start command
-func StartFlags() (VMSpec, error) {
-	var customSpec VMSpec
-
-	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	vmFlags(fs, &customSpec)
-	if err := fs.Parse(flag.Args()[1:]); err != nil {
-		return customSpec, err
-	}
-
-	return customSpec, nil
 }
 
 func prepareCreate(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) (*workload, *workspace, error) {

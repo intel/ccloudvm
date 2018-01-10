@@ -14,10 +14,24 @@
 // limitations under the License.
 */
 
-package main
+package cmd
 
-import "github.com/intel/ccloudvm/cmd"
+import (
+	"github.com/intel/ccloudvm/ccvm"
+	"github.com/spf13/cobra"
+)
 
-func main() {
-	cmd.Execute()
+var connectCmd = &cobra.Command{
+	Use:   "connect",
+	Short: "Connects to a VM via SSH",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancelFunc := getSignalContext()
+		defer cancelFunc()
+
+		return ccvm.Connect(ctx)
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(connectCmd)
 }

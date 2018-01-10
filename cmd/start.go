@@ -14,10 +14,33 @@
 // limitations under the License.
 */
 
-package main
+package cmd
 
-import "github.com/intel/ccloudvm/cmd"
+import (
+	"flag"
 
-func main() {
-	cmd.Execute()
+	"github.com/intel/ccloudvm/ccvm"
+	"github.com/spf13/cobra"
+)
+
+var startSpec ccvm.VMSpec
+
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Boots a stopped VM",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancelFunc := getSignalContext()
+		defer cancelFunc()
+
+		return ccvm.Start(ctx, &startSpec)
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(startCmd)
+
+	var flags flag.FlagSet
+	ccvm.VMFlags(&flags, &createSpec)
+
+	startCmd.Flags().AddGoFlagSet(&flags)
 }
