@@ -3,7 +3,12 @@
 
 [[projects]]
   name = "github.com/ciao-project/ciao"
-  packages = ["clogger","deviceinfo","osprepare","uuid"]
+  packages = [
+    "clogger",
+    "deviceinfo",
+    "osprepare",
+    "uuid"
+  ]
   revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
 
 [[projects]]
@@ -15,6 +20,7 @@
 [[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
+  revision = ""
   version = "v1.0.0"
 
 [[projects]]
@@ -26,6 +32,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b1733143571f6b77c233fa2a63490ddcb37a1fd63a39092a3183be0c67637d79"
+  inputs-digest = "1dacc0d637dcd1284d3e450dbd487563a38d3ba06f1b818068f5c91102245e3f"
   solver-name = "gps-cdcl"
   solver-version = 1
