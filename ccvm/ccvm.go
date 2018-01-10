@@ -112,13 +112,13 @@ func (d *drives) Set(value string) error {
 	return nil
 }
 
-func vmFlags(fs *flag.FlagSet, memGB, CPUs *int, m *mounts, p *ports, d *drives, qemuport *uint) {
-	fs.IntVar(memGB, "mem", *memGB, "Gigabytes of RAM allocated to VM")
-	fs.IntVar(CPUs, "cpus", *CPUs, "VCPUs assigned to VM")
-	fs.Var(m, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
-	fs.Var(d, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
-	fs.Var(p, "port", "port mapping. Format is host_port-guest_port, e.g., -port 10022-22")
-	fs.UintVar(qemuport, "qemuport", *qemuport, "Port to follow qemu logs of the guest machine, eg., --qemuport=9999")
+func vmFlags(fs *flag.FlagSet, customSpec *VMSpec) {
+	fs.IntVar(&customSpec.MemGiB, "mem", customSpec.MemGiB, "Gigabytes of RAM allocated to VM")
+	fs.IntVar(&customSpec.CPUs, "cpus", customSpec.CPUs, "VCPUs assigned to VM")
+	fs.Var(&customSpec.Mounts, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
+	fs.Var(&customSpec.Drives, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
+	fs.Var(&customSpec.PortMappings, "port", "port mapping. Format is host_port-guest_port, e.g., -port 10022-22")
+	fs.UintVar(&customSpec.Qemuport, "qemuport", customSpec.Qemuport, "Port to follow qemu logs of the guest machine, eg., --qemuport=9999")
 }
 
 func checkDirectory(dir string) error {
@@ -144,20 +144,15 @@ func checkDirectory(dir string) error {
 
 func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	var debug bool
-	var m mounts
-	var p ports
-	var d drives
-	var memGiB, CPUs int
-	var qemuport uint
 	var update packageUpgrade
-
+	var customSpec VMSpec
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s create <workload> \n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  <workload>\tName of the workload to create\n\n")
 		fs.PrintDefaults()
 	}
-	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d, &qemuport)
+	vmFlags(fs, &customSpec)
 	fs.BoolVar(&debug, "debug", false, "Enables debug mode")
 	fs.Var(&update, "package-upgrade",
 		"Hint to enable or disable update of VM packages. Should be true or false")
@@ -172,8 +167,8 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	}
 	workloadName := fs.Arg(0)
 
-	for i := range m {
-		if err := checkDirectory(m[i].Path); err != nil {
+	for i := range customSpec.Mounts {
+		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
 			return nil, false, err
 		}
 	}
@@ -184,19 +179,19 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 	}
 
 	in := &wkl.spec.VM
-	if memGiB != 0 {
-		in.MemGiB = memGiB
+	if customSpec.MemGiB != 0 {
+		in.MemGiB = customSpec.MemGiB
 	}
-	if CPUs != 0 {
-		in.CPUs = CPUs
+	if customSpec.CPUs != 0 {
+		in.CPUs = customSpec.CPUs
 	}
-	if qemuport != 0 {
-		in.Qemuport = qemuport
+	if customSpec.Qemuport != 0 {
+		in.Qemuport = customSpec.Qemuport
 	}
 
-	in.mergeMounts(m)
-	in.mergePorts(p)
-	in.mergeDrives(d)
+	in.mergeMounts(customSpec.Mounts)
+	in.mergePorts(customSpec.PortMappings)
+	in.mergeDrives(customSpec.Drives)
 
 	ws.Mounts = in.Mounts
 	ws.Hostname = wkl.spec.Hostname
@@ -211,32 +206,26 @@ func createFlags(ctx context.Context, ws *workspace) (*workload, bool, error) {
 }
 
 func startFlags(in *VMSpec) error {
-	var m mounts
-	var p ports
-	var d drives
-
-	CPUs := in.CPUs
-	memGiB := in.MemGiB
-	qemuport := in.Qemuport
+	customSpec := *in
 
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
-	vmFlags(fs, &memGiB, &CPUs, &m, &p, &d, &qemuport)
+	vmFlags(fs, &customSpec)
 	if err := fs.Parse(flag.Args()[1:]); err != nil {
 		return err
 	}
 
-	for i := range m {
-		if err := checkDirectory(m[i].Path); err != nil {
+	for i := range customSpec.Mounts {
+		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
 			return err
 		}
 	}
 
-	in.CPUs = CPUs
-	in.MemGiB = memGiB
-	in.Qemuport = qemuport
-	in.mergeMounts(m)
-	in.mergePorts(p)
-	in.mergeDrives(d)
+	in.CPUs = customSpec.CPUs
+	in.MemGiB = customSpec.MemGiB
+	in.Qemuport = customSpec.Qemuport
+	in.mergeMounts(customSpec.Mounts)
+	in.mergePorts(customSpec.PortMappings)
+	in.mergeDrives(customSpec.Drives)
 
 	return nil
 }
