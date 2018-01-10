@@ -170,25 +170,22 @@ func StartFlags() (VMSpec, error) {
 	return customSpec, nil
 }
 
-// Create sets up the VM
-func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) error {
-	var err error
-
+func prepareCreate(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) (*workload, *workspace, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	wkld, err := createWorkload(ctx, ws, workloadName)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	in := &wkld.spec.VM
 
 	err = in.mergeCustom(customSpec)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	ws.Mounts = in.Mounts
@@ -198,13 +195,26 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
 		ws.NoProxy = ws.Hostname
 	}
+
 	ws.PackageUpgrade = "false"
 	if update {
 		ws.PackageUpgrade = "true"
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
+		return nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
+	}
+
+	return wkld, ws, nil
+}
+
+// Create sets up the VM
+func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) error {
+	var err error
+
+	wkld, ws, err := prepareCreate(ctx, workloadName, debug, update, customSpec)
+	if err != nil {
+		return err
 	}
 
 	_, err = os.Stat(ws.instanceDir)
@@ -252,9 +262,10 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
-	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", in.MemGiB, in.CPUs)
+	spec := wkld.spec.VM
+	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", spec.MemGiB, spec.CPUs)
 
-	err = bootVM(ctx, ws, in)
+	err = bootVM(ctx, ws, &spec)
 	if err != nil {
 		return err
 	}
