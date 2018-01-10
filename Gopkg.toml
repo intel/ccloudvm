@@ -23,7 +23,7 @@
 
 [[constraint]]
   name = "github.com/ciao-project/ciao"
-  revision = "60525fba8e5f4f1bf3ad02b8f5854c4dcf735a78"
+  revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
 
 [[constraint]]
   name = "github.com/pmezard/go-difflib"
