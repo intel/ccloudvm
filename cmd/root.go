@@ -27,8 +27,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ccloudvm",
-	Short: "Configurable Cloud VM (ccloudvm) allows the creation and management of VMs from cloud-init files",
+	Use:          "ccloudvm",
+	Short:        "Configurable Cloud VM (ccloudvm) allows the creation and management of VMs from cloud-init files",
+	SilenceUsage: true,
 }
 
 // Execute is the entry into the cmd package from the main package.

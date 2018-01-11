@@ -46,6 +46,6 @@ func init() {
 	ccvm.VMFlags(&flags, &createSpec)
 
 	createCmd.Flags().AddGoFlagSet(&flags)
-	createCmd.Flags().Bool("debug", false, "Enable debugging mode")
-	createCmd.Flags().Bool("package-upgrade", true, "Hint as to whether to upgrade packages on creation")
+	createCmd.Flags().BoolVar(&createDebug, "debug", false, "Enable debugging mode")
+	createCmd.Flags().BoolVar(&createPackageUpgrade, "package-upgrade", false, "Hint as to whether to upgrade packages on creation")
 }

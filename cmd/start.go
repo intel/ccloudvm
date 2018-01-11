@@ -40,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 
 	var flags flag.FlagSet
-	ccvm.VMFlags(&flags, &createSpec)
+	ccvm.VMFlags(&flags, &startSpec)
 
 	startCmd.Flags().AddGoFlagSet(&flags)
 }
