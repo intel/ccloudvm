@@ -52,6 +52,11 @@ func TestSystem(t *testing.T) {
 		t.Errorf("Failed to Restart instance: %v", err)
 	}
 
+	_, _, err = waitForSSH(ctx)
+	if err != nil {
+		t.Errorf("Instance not available via SSH: %v", err)
+	}
+
 	err = Quit(ctx)
 	if err != nil {
 		t.Errorf("Failed to Restart instance: %v", err)

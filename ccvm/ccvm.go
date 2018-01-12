@@ -342,27 +342,21 @@ func Status(ctx context.Context) error {
 	return nil
 }
 
-// Connect to the VM via SSH
-func Connect(ctx context.Context) error {
+func waitForSSH(ctx context.Context) (*workspace, int, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		return fmt.Errorf("Unable to load instance state: %v", err)
+		return nil, 0, fmt.Errorf("Unable to load instance state: %v", err)
 	}
 	in := &wkld.spec.VM
 
-	path, err := exec.LookPath("ssh")
-	if err != nil {
-		return fmt.Errorf("Unable to locate ssh binary")
-	}
-
 	sshPort, err := in.sshPort()
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
 	if !sshReady(ctx, sshPort) {
@@ -372,7 +366,7 @@ func Connect(ctx context.Context) error {
 			select {
 			case <-time.After(time.Second):
 			case <-ctx.Done():
-				return fmt.Errorf("Cancelled")
+				return nil, 0, fmt.Errorf("Cancelled")
 			}
 
 			if sshReady(ctx, sshPort) {
@@ -382,6 +376,21 @@ func Connect(ctx context.Context) error {
 			fmt.Print(".")
 		}
 		fmt.Println()
+	}
+
+	return ws, sshPort, nil
+}
+
+// Connect to the VM via SSH
+func Connect(ctx context.Context) error {
+	path, err := exec.LookPath("ssh")
+	if err != nil {
+		return fmt.Errorf("Unable to locate ssh binary")
+	}
+
+	ws, sshPort, err := waitForSSH(ctx)
+	if err != nil {
+		return err
 	}
 
 	err = syscall.Exec(path, []string{path,
