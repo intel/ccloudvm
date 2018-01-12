@@ -146,3 +146,7 @@ then
     echo "~/.ccloudvm/instance still exists"
     false
 fi
+
+# Run the unit tests
+
+go test -v github.com/intel/ccloudvm/ccvm
