@@ -5,6 +5,7 @@ set -e
 
 function finish {
     error_code=$?
+    set +e
 
     if [ $created -eq 1 ]
     then
