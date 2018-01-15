@@ -149,9 +149,9 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 	ws.Mounts = in.Mounts
 	ws.Hostname = wkld.spec.Hostname
 	if ws.NoProxy != "" {
-		ws.NoProxy = fmt.Sprintf("%s,%s", ws.Hostname, ws.NoProxy)
+		ws.NoProxy = fmt.Sprintf("%s,%s,10.0.2.2", ws.Hostname, ws.NoProxy)
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
-		ws.NoProxy = ws.Hostname
+		ws.NoProxy = fmt.Sprintf("%s,10.0.2.2", ws.Hostname)
 	}
 
 	ws.PackageUpgrade = "false"
