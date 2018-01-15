@@ -70,6 +70,8 @@ type workspace struct {
 	HTTPSProxy     string
 	NoProxy        string
 	User           string
+	UID            int
+	GID            int
 	PublicKey      string
 	HTTPServerPort int
 	GitUserName    string
@@ -178,6 +180,9 @@ func prepareEnv(ctx context.Context) (*workspace, error) {
 	if ws.User == "" {
 		return nil, fmt.Errorf("USER is not defined")
 	}
+
+	ws.UID = os.Getuid()
+	ws.GID = os.Getgid()
 
 	ws.HTTPProxy, err = getProxy("HTTP_PROXY", "http_proxy")
 	if err != nil {
