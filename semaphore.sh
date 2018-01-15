@@ -149,4 +149,10 @@ fi
 
 # Run the unit tests
 
-go test -v github.com/intel/ccloudvm/ccvm
+if [ "$SEMAPHORE_REPO_SLUG" = "intel/ccloudvm" ]
+then
+    go get github.com/mattn/goveralls
+    $GOPATH/bin/goveralls -v -service=semaphore --package github.com/intel/ccloudvm/ccvm
+else
+    go test -v github.com/intel/ccloudvm/ccvm
+fi
