@@ -18,11 +18,35 @@ package ccvm
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
 const standardTimeout = time.Second * 300
+
+func setupDownloadDir(t *testing.T) (string, string) {
+	home := os.Getenv("HOME")
+	if home == "" {
+		t.Fatalf("Unable to determine home directory")
+	}
+
+	tmpDir, err := ioutil.TempDir(home, "ccloudvmtest-")
+	if err != nil {
+		t.Fatalf("Unable to create temporary directory: %v", err)
+	}
+
+	downDir := filepath.Join(tmpDir, "down")
+	err = os.Mkdir(downDir, 0755)
+	if err != nil {
+		_ = os.RemoveAll(tmpDir)
+		t.Fatalf("Unable to create download directory %s: %v", downDir, err)
+	}
+
+	return tmpDir, downDir
+}
 
 func TestSystem(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), standardTimeout)
@@ -30,9 +54,31 @@ func TestSystem(t *testing.T) {
 		cancelFunc()
 	}()
 
-	vmSpec := &VMSpec{MemGiB: 1, CPUs: 1}
+	// Create a directory which will be mounted inside the newly created
+	// instance.  This directory will contain a sub directory called down
+	// into which the instance will download the README.md file of this
+	// project.  At the end of the test we check for the existence of
+	// this file on the host, checking download and mounting.  This test
+	// requires the cooperation of the semaphore.yaml workload.
 
-	err := Create(ctx, "xenial", false, false, vmSpec)
+	tmpDir, downDir := setupDownloadDir(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	vmSpec := &VMSpec{
+		MemGiB: 1,
+		CPUs:   1,
+		Mounts: []mount{
+			{
+				Tag:           "tmpdir",
+				SecurityModel: "passthrough",
+				Path:          tmpDir,
+			},
+		},
+	}
+
+	err := Create(ctx, "semaphore", false, false, vmSpec)
 	if err != nil {
 		t.Fatalf("Unable to create VM: %v", err)
 	}
@@ -65,5 +111,11 @@ func TestSystem(t *testing.T) {
 	err = Delete(context.Background())
 	if err != nil {
 		t.Errorf("Failed to Delete instance: %v", err)
+	}
+
+	readmePath := filepath.Join(downDir, "README.md")
+	_, err = os.Stat(readmePath)
+	if err != nil {
+		t.Errorf("Expected %s to exist: %v", readmePath, err)
 	}
 }
