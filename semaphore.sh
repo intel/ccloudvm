@@ -5,6 +5,7 @@ set -e
 
 function finish {
     error_code=$?
+    set +e
 
     if [ $created -eq 1 ]
     then
@@ -144,4 +145,14 @@ if test -d ~/.ccloudvm/instance
 then
     echo "~/.ccloudvm/instance still exists"
     false
+fi
+
+# Run the unit tests
+
+if [ "$SEMAPHORE_REPO_SLUG" = "intel/ccloudvm" ]
+then
+    go get github.com/mattn/goveralls
+    $GOPATH/bin/goveralls -v -service=semaphore --package github.com/intel/ccloudvm/ccvm
+else
+    go test -v github.com/intel/ccloudvm/ccvm
 fi

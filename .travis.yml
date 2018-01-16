@@ -1,8 +1,8 @@
 language: go
 
 go:
-    - 1.7
     - 1.8
+    - 1.9
     - tip
 
 go_import_path: github.com/intel/ccloudvm
@@ -13,10 +13,8 @@ matrix:
 
 before_install:
   - go get github.com/alecthomas/gometalinter
-  - go get github.com/ciao-project/ciao/test-cases
   - gometalinter --install
 
 script:
    - go env
-   - test-cases ./...
    - gometalinter --tests --vendor --disable-all --enable=misspell --enable=vet --enable=ineffassign --enable=gofmt --enable=gocyclo --cyclo-over=15 --enable=golint --enable=errcheck --enable=deadcode ./...

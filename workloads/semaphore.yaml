@@ -51,10 +51,18 @@ runcmd:
  - {{endTaskCheck $}}
 {{end}}
 
+{{with .Mounts}}
+ - {{beginTask $ "Downloading README file" }}
+ - su -c "{{download $ "https://raw.githubusercontent.com/intel/ccloudvm/master/README.md" (printf "%s/down/README.md" (index . 0).Path)}}" {{$.User}}
+ - {{endTaskCheck $}}
+{{end}}
+
  - {{finished .}}
 
 users:
   - name: {{.User}}
+    uid: "{{.UID}}"
+    gid: "{{.GID}}"
     gecos: CIAO Demo User
     lock-passwd: true
     shell: /bin/bash
