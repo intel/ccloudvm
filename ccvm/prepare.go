@@ -342,19 +342,26 @@ func buildISOImage(ctx context.Context, instanceDir, tmpl string, ws *workspace,
 		"finished":     finishedFN,
 	}
 
-	udt := template.Must(template.New("user-data").Funcs(funcMap).Parse(tmpl))
+	udt, err := template.New("user-data").Funcs(funcMap).Parse(tmpl)
+	if err != nil {
+		return fmt.Errorf("Unable to parse user data template : %v", err)
+	}
+
+	mdt, err := template.New("meta-data").Parse(metaDataTemplate)
+	if err != nil {
+		return fmt.Errorf("Unable to parse meta data template : %v", err)
+	}
+
 	var udBuf bytes.Buffer
-	err := udt.Execute(&udBuf, ws)
+	err = udt.Execute(&udBuf, ws)
 	if err != nil {
 		return fmt.Errorf("Unable to execute user data template : %v", err)
 	}
 
-	mdt := template.Must(template.New("meta-data").Parse(metaDataTemplate))
-
 	var mdBuf bytes.Buffer
 	err = mdt.Execute(&mdBuf, ws)
 	if err != nil {
-		return fmt.Errorf("Unable to execute user data template : %v", err)
+		return fmt.Errorf("Unable to execute meta data template : %v", err)
 	}
 
 	if debug {
