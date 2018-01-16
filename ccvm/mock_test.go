@@ -51,6 +51,7 @@ vm:
 var mockVMSpec = VMSpec{
 	MemGiB:       3,
 	CPUs:         2,
+	DiskGiB:      60,
 	PortMappings: []portMapping{{Host: 10022, Guest: 22}},
 	Mounts:       []mount{},
 }
