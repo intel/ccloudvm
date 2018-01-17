@@ -36,6 +36,7 @@ const document2 = `# A list
 `
 
 const twoDocuments = "---\n" + document1 + "...\n----\n" + document2 + "...\n"
+const twoDocumentsSimplified = document1 + "---\n" + document2
 
 func toStringSlice(s [][]byte) []string {
 	ss := make([]string, len(s))
@@ -53,6 +54,7 @@ func TestSplitYaml(t *testing.T) {
 		{"", [][]byte{}},
 		{document1, [][]byte{[]byte(document1)}},
 		{twoDocuments, [][]byte{[]byte(document1), []byte(document2)}},
+		{twoDocumentsSimplified, [][]byte{[]byte(document1), []byte(document2)}},
 	}
 
 	for i := range tests {
