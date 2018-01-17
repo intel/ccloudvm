@@ -26,6 +26,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -147,7 +148,7 @@ func (in *VMSpec) loadLegacyInstance(ws *workspace) error {
 func (in *VMSpec) unmarshal(data []byte) error {
 	err := yaml.Unmarshal(data, in)
 	if err != nil {
-		return fmt.Errorf("Unable to unmarshal instance state : %v", err)
+		return errors.Wrap(err, "Unable to unmarshal instance state")
 	}
 
 	for i := range in.Mounts {
@@ -192,12 +193,12 @@ func (in *VMSpec) unmarshal(data []byte) error {
 func (in *VMSpec) unmarshalWithTemplate(ws *workspace, data string) error {
 	tmpl, err := template.New("instance-data").Parse(string(data))
 	if err != nil {
-		return fmt.Errorf("Unable to parse instance data template: %v", err)
+		return errors.Wrap(err, "Unable to parse instance data template")
 	}
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, ws)
 	if err != nil {
-		return fmt.Errorf("Unable to execute instance data template: %v", err)
+		return errors.Wrap(err, "Unable to execute instance data template")
 	}
 	return in.unmarshal(buf.Bytes())
 }
@@ -295,7 +296,7 @@ func (in *VMSpec) sshPort() (int, error) {
 func (ins *workloadSpec) unmarshal(data []byte) error {
 	err := yaml.Unmarshal(data, ins)
 	if err != nil {
-		return fmt.Errorf("Unable to unmarshal instance specification : %v", err)
+		return errors.Wrap(err, "Unable to unmarshal instance specification")
 	}
 
 	if ins.BaseImageURL == "" {
@@ -326,12 +327,12 @@ func (ins *workloadSpec) unmarshal(data []byte) error {
 func (ins *workloadSpec) unmarshalWithTemplate(ws *workspace, data string) error {
 	tmpl, err := template.New("instance-spec").Parse(string(data))
 	if err != nil {
-		return fmt.Errorf("Unable to parse instance data template: %v", err)
+		return errors.Wrap(err, "Unable to parse instance data template")
 	}
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, ws)
 	if err != nil {
-		return fmt.Errorf("Unable to execute instance data template: %v", err)
+		return errors.Wrap(err, "Unable to execute instance data template")
 	}
 	return ins.unmarshal(buf.Bytes())
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/ciao-project/ciao/osprepare"
 	"github.com/ciao-project/ciao/uuid"
 	"github.com/intel/govmm/qemu"
+	"github.com/pkg/errors"
 )
 
 const metaDataTemplate = `
@@ -130,13 +131,13 @@ func prepareSSHKeys(ctx context.Context, ws *workspace) error {
 		err := exec.CommandContext(ctx, "ssh-keygen",
 			"-f", ws.keyPath, "-t", "rsa", "-N", "").Run()
 		if err != nil {
-			return fmt.Errorf("Unable to generate SSH key pair : %v", err)
+			return errors.Wrap(err, "Unable to generate SSH key pair")
 		}
 	}
 
 	publicKey, err := ioutil.ReadFile(ws.publicKeyPath)
 	if err != nil {
-		return fmt.Errorf("Unable to read public ssh key: %v", err)
+		return errors.Wrap(err, "Unable to read public ssh key")
 	}
 
 	ws.PublicKey = string(publicKey)
@@ -159,7 +160,7 @@ func getProxy(upper, lower string) (string, error) {
 
 	proxyURL, err := url.Parse(proxy)
 	if err != nil {
-		return "", fmt.Errorf("Failed to parse %s : %v", proxy, err)
+		return "", errors.Wrapf(err, "Failed to parse %s", proxy)
 	}
 	return proxyURL.String(), nil
 }
@@ -344,24 +345,24 @@ func buildISOImage(ctx context.Context, instanceDir, tmpl string, ws *workspace,
 
 	udt, err := template.New("user-data").Funcs(funcMap).Parse(tmpl)
 	if err != nil {
-		return fmt.Errorf("Unable to parse user data template : %v", err)
+		return errors.Wrap(err, "Unable to parse user data template")
 	}
 
 	mdt, err := template.New("meta-data").Parse(metaDataTemplate)
 	if err != nil {
-		return fmt.Errorf("Unable to parse meta data template : %v", err)
+		return errors.Wrap(err, "Unable to parse meta data template")
 	}
 
 	var udBuf bytes.Buffer
 	err = udt.Execute(&udBuf, ws)
 	if err != nil {
-		return fmt.Errorf("Unable to execute user data template : %v", err)
+		return errors.Wrap(err, "Unable to execute user data template")
 	}
 
 	var mdBuf bytes.Buffer
 	err = mdt.Execute(&mdBuf, ws)
 	if err != nil {
-		return fmt.Errorf("Unable to execute meta data template : %v", err)
+		return errors.Wrap(err, "Unable to execute meta data template")
 	}
 
 	if debug {

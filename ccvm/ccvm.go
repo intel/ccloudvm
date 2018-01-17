@@ -27,6 +27,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type mounts []mount
@@ -87,7 +89,7 @@ func (d *drives) Set(value string) error {
 	}
 	_, err := os.Stat(components[0])
 	if err != nil {
-		return fmt.Errorf("Unable to access %s : %v", components[1], err)
+		return errors.Wrapf(err, "Unable to access %s", components[1])
 	}
 	*d = append(*d, drive{
 		Path:    components[0],
@@ -118,7 +120,7 @@ func checkDirectory(dir string) error {
 
 	fi, err := os.Stat(dir)
 	if err != nil {
-		return fmt.Errorf("Unable to stat %s : %v", dir, err)
+		return errors.Wrapf(err, "Unable to stat %s", dir)
 	}
 
 	if !fi.IsDir() {
@@ -185,7 +187,7 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 
 	err = os.MkdirAll(ws.instanceDir, 0755)
 	if err != nil {
-		return fmt.Errorf("unable to create cache dir: %v", err)
+		return errors.Wrap(err, "unable to create cache dir")
 	}
 
 	defer func() {
@@ -196,7 +198,7 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 
 	err = wkld.save(ws)
 	if err != nil {
-		return fmt.Errorf("Unable to save instance state : %v", err)
+		return errors.Wrap(err, "Unable to save instance state")
 	}
 
 	err = prepareSSHKeys(ctx, ws)
@@ -328,7 +330,7 @@ func Status(ctx context.Context) error {
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		return fmt.Errorf("Unable to load instance state: %v", err)
+		return errors.Wrap(err, "Unable to load instance state")
 	}
 	in := &wkld.spec.VM
 
@@ -350,7 +352,7 @@ func waitForSSH(ctx context.Context) (*workspace, int, error) {
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		return nil, 0, fmt.Errorf("Unable to load instance state: %v", err)
+		return nil, 0, errors.Wrap(err, "Unable to load instance state")
 	}
 	in := &wkld.spec.VM
 
@@ -414,7 +416,7 @@ func Delete(ctx context.Context) error {
 	_ = quitVM(ctx, ws.instanceDir)
 	err = os.RemoveAll(ws.instanceDir)
 	if err != nil {
-		return fmt.Errorf("unable to delete instance: %v", err)
+		return errors.Wrap(err, "unable to delete instance")
 	}
 
 	return nil

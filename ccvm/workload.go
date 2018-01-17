@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -52,7 +53,7 @@ func (wkld *workload) save(ws *workspace) error {
 	_, _ = buf.WriteString("---\n")
 	data, err := yaml.Marshal(wkld.spec)
 	if err != nil {
-		return fmt.Errorf("Unable to marshal instance specification : %v", err)
+		return errors.Wrap(err, "Unable to marshal instance specification")
 	}
 	_, _ = buf.Write(data)
 	_, _ = buf.WriteString("...\n")
@@ -64,7 +65,7 @@ func (wkld *workload) save(ws *workspace) error {
 	err = ioutil.WriteFile(path.Join(ws.instanceDir, "state.yaml"),
 		buf.Bytes(), 0600)
 	if err != nil {
-		return fmt.Errorf("Unable to write instance state : %v", err)
+		return errors.Wrap(err, "Unable to write instance state")
 	}
 
 	return nil
@@ -77,7 +78,7 @@ func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
 	case "http", "https":
 		workloadFile, err := ioutil.TempFile("", ".workload")
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create a temporal file: %s", err)
+			return nil, errors.Wrap(err, "Failed to create a temporal file")
 		}
 
 		workloadPath = workloadFile.Name()
@@ -88,7 +89,7 @@ func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
 		err = getFile(ctx, u.String(), workloadFile, downloadProgress)
 		cancelFunc()
 		if err != nil {
-			return nil, fmt.Errorf("Unable download workload file from %s: %v", u.String(), err)
+			return nil, errors.Wrapf(err, "Unable download workload file from %s", u.String())
 		}
 	case "file":
 		workloadPath = u.Path
@@ -103,7 +104,7 @@ func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
 func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string) ([]byte, error) {
 	u, err := url.Parse(workloadName)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to parse workload name %s: %s", workloadName, err)
+		return nil, errors.Wrapf(err, "Unable to parse workload name %s", workloadName)
 	}
 
 	// Absolute means that it has a non-empty scheme
@@ -124,7 +125,7 @@ func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string) (
 
 	p, err := build.Default.Import(ccloudvmPkg, "", build.FindOnly)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to locate ccloudvm workload directory: %v", err)
+		return nil, errors.Wrap(err, "Unable to locate ccloudvm workload directory")
 	}
 	workloadPath := filepath.Join(p.Dir, "workloads", fmt.Sprintf("%s.yaml", workloadName))
 	wkld, err = ioutil.ReadFile(workloadPath)

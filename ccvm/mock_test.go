@@ -17,11 +17,12 @@
 package ccvm
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 const xenialWorkloadSpecNoVM = `
@@ -68,7 +69,7 @@ func createMockWorkSpaceWithWorkload(workload, workloadName, ccvmDir string) (*w
 	workloadDir := filepath.Join(ccvmDir, "workloads")
 	err := os.MkdirAll(workloadDir, 0750)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create directory %s: %v", workloadDir, err)
+		return nil, errors.Wrapf(err, "Failed to create directory %s", workloadDir)
 	}
 
 	ws := &workspace{
@@ -78,7 +79,7 @@ func createMockWorkSpaceWithWorkload(workload, workloadName, ccvmDir string) (*w
 	workloadFile := path.Join(workloadDir, workloadName+".yaml")
 	err = ioutil.WriteFile(workloadFile, []byte(workload), 0640)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to write workload file %s: %v", workloadFile, err)
+		return nil, errors.Wrapf(err, "Failed to write workload file %s", workloadFile)
 	}
 
 	return ws, nil
@@ -87,7 +88,7 @@ func createMockWorkSpaceWithWorkload(workload, workloadName, ccvmDir string) (*w
 func createMockWorkSpaceWithInstance(workload, ccvmDir string) (*workspace, error) {
 	instanceDir, err := ioutil.TempDir(ccvmDir, "wkl-")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create directory %s: %v", instanceDir, err)
+		return nil, errors.Wrapf(err, "Failed to create directory %s", instanceDir)
 	}
 
 	ws := &workspace{
@@ -98,7 +99,7 @@ func createMockWorkSpaceWithInstance(workload, ccvmDir string) (*workspace, erro
 	workloadFile := path.Join(ws.instanceDir, "state.yaml")
 	err = ioutil.WriteFile(workloadFile, []byte(workload), 0640)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to write workload file %s: %v", workloadFile, err)
+		return nil, errors.Wrapf(err, "Failed to write workload file %s", workloadFile)
 	}
 
 	return ws, nil
