@@ -44,6 +44,7 @@ func init() {
 
 	var flags flag.FlagSet
 	ccvm.VMFlags(&flags, &createSpec)
+	flags.IntVar(&createSpec.DiskGiB, "disk", createSpec.DiskGiB, "Gibibytes of disk space allocated to Rootfs")
 
 	createCmd.Flags().AddGoFlagSet(&flags)
 	createCmd.Flags().BoolVar(&createDebug, "debug", false, "Enable debugging mode")

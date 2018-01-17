@@ -215,12 +215,12 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
-	err = createRootfs(ctx, qcowPath, ws.instanceDir)
+	spec := wkld.spec.VM
+	err = createRootfs(ctx, qcowPath, ws.instanceDir, spec.DiskGiB)
 	if err != nil {
 		return err
 	}
 
-	spec := wkld.spec.VM
 	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", spec.MemGiB, spec.CPUs)
 
 	err = bootVM(ctx, ws, &spec)

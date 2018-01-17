@@ -17,6 +17,7 @@
 package ccvm
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -73,6 +74,56 @@ func TestSplitYaml(t *testing.T) {
 	}
 }
 
+func TestCreateWorkload(t *testing.T) {
+	ccvmDir, err := ioutil.TempDir("", "ccloudvm-tests-")
+	if err != nil {
+		t.Fatalf("Failed to create temporary directory: %v", err)
+	}
+
+	defer func() {
+		if err := os.RemoveAll(ccvmDir); err != nil {
+			t.Errorf("Failed to remove %s : %v", ccvmDir, err)
+		}
+	}()
+
+	ws, err := createMockWorkSpaceWithWorkload(sampleWorkload, "workload", ccvmDir)
+	if err != nil {
+		t.Errorf("Failed to create mock workload : %v", err)
+	} else {
+		workload, err := createWorkload(context.Background(), ws, "workload")
+		if err != nil {
+			t.Errorf("Unable to create workload : %v", err)
+		} else {
+			if !reflect.DeepEqual(mockVMSpec, workload.spec.VM) {
+				t.Errorf("Expected %+v got %+v", mockVMSpec, workload.spec.VM)
+			}
+		}
+	}
+
+	ws, err = createMockWorkSpaceWithWorkload("\n---\n", "workload", ccvmDir)
+	if err != nil {
+		t.Errorf("Failed to create mock workload : %v", err)
+	} else {
+		workload, err := createWorkload(context.Background(), ws, "workload")
+		if err != nil {
+			t.Errorf("Unable to create workload : %v", err)
+		} else {
+			if workload.spec.VM.DiskGiB != 60 {
+				t.Errorf("Disk size should be set to default of %d", 60)
+			}
+			if workload.spec.VM.CPUs == 0 {
+				t.Errorf("CPUs should be greater than 0")
+			}
+			if workload.spec.VM.MemGiB == 0 {
+				t.Errorf("Memory should be greater than 0")
+			}
+			if len(workload.spec.VM.PortMappings) == 0 {
+				t.Errorf("Theres should be at least one port mapped for SSH")
+			}
+		}
+	}
+}
+
 func TestRestoreWorkload(t *testing.T) {
 	tests := []struct {
 		checkSpec bool // Should we check the workload.spec content?
@@ -100,7 +151,7 @@ func TestRestoreWorkload(t *testing.T) {
 	for i := range tests {
 		test := &tests[i]
 
-		ws, err := createMockWorkSpaceWithWorkload(test.workload, ccvmDir)
+		ws, err := createMockWorkSpaceWithInstance(test.workload, ccvmDir)
 		if err != nil {
 			t.Errorf("Failed to create mock workload : %v", err)
 			continue

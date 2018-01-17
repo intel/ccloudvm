@@ -36,6 +36,8 @@ const (
 	CLEARCONTAINERS = "clearcontainers"
 )
 
+const defaultRootFSSize = 60
+
 // Constants for the Guest image used by ccloudvm
 
 const (
@@ -76,6 +78,7 @@ func (d drive) String() string {
 // VMSpec holds the per-VM state.
 type VMSpec struct {
 	MemGiB       int    `yaml:"mem_gib"`
+	DiskGiB      int    `yaml:"disk_gib"`
 	CPUs         int    `yaml:"cpus"`
 	PortMappings ports  `yaml:"ports"`
 	Mounts       mounts `yaml:"mounts"`
@@ -163,6 +166,10 @@ func (in *VMSpec) unmarshal(data []byte) error {
 		if in.CPUs == 0 {
 			in.CPUs = cpuDef
 		}
+	}
+
+	if in.DiskGiB == 0 {
+		in.DiskGiB = defaultRootFSSize
 	}
 
 	var i int
@@ -261,6 +268,9 @@ func (in *VMSpec) mergeCustom(customSpec *VMSpec) error {
 	}
 	if customSpec.CPUs != 0 {
 		in.CPUs = customSpec.CPUs
+	}
+	if customSpec.DiskGiB != 0 {
+		in.DiskGiB = customSpec.DiskGiB
 	}
 	if customSpec.Qemuport != 0 {
 		in.Qemuport = customSpec.Qemuport

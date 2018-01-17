@@ -372,15 +372,14 @@ func buildISOImage(ctx context.Context, instanceDir, tmpl string, ws *workspace,
 	return createCloudInitISO(ctx, instanceDir, udBuf.Bytes(), mdBuf.Bytes())
 }
 
-// TODO: Code copied from launcher.  Needs to be moved to qemu
-
-func createRootfs(ctx context.Context, backingImage, instanceDir string) error {
+func createRootfs(ctx context.Context, backingImage, instanceDir string, disk int) error {
 	vmImage := path.Join(instanceDir, "image.qcow2")
 	if _, err := os.Stat(vmImage); err == nil {
 		_ = os.Remove(vmImage)
 	}
+	diskParam := fmt.Sprintf("%dG", disk)
 	params := make([]string, 0, 32)
 	params = append(params, "create", "-f", "qcow2", "-o", "backing_file="+backingImage,
-		vmImage, "60000M")
+		vmImage, diskParam)
 	return exec.CommandContext(ctx, "qemu-img", params...).Run()
 }

@@ -1,6 +1,8 @@
 ---
 base_image_url: https://cloud-images.ubuntu.com/artful/current/artful-server-cloudimg-amd64.img
 base_image_name: Ubuntu 17.10
+vm:
+  disk_gib: 16
 ...
 ---
 {{- define "ENV" -}}

@@ -2,6 +2,8 @@
 base_image_url: https://mirror.us-midwest-1.nexcess.net/fedora/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2
 base_image_name: Fedora 27
 hostname: singlevm
+vm:
+  disk_gib: 16
 ...
 ---
 #cloud-config
