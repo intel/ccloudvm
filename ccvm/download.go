@@ -26,6 +26,8 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 type downloadInfo struct {
@@ -161,7 +163,7 @@ func downloadFile(ctx context.Context, URL, ccvmDir string, cb progressCB) (stri
 
 	f, err := os.Create(tmpImgPath)
 	if err != nil {
-		return "", fmt.Errorf("Unable to create download file: %v", err)
+		return "", errors.Wrap(err, "Unable to create download file")
 	}
 
 	err = getFile(ctx, URL, f, cb)

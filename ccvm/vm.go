@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/intel/govmm/qemu"
+	"github.com/pkg/errors"
 )
 
 // Download Parameters
@@ -118,18 +119,18 @@ func executeQMPCommand(ctx context.Context, instanceDir string,
 	disconnectedCh := make(chan struct{})
 	qmp, _, err := qemu.QMPStart(ctx, socket, qemu.QMPConfig{}, disconnectedCh)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to VM : %v", err)
+		return errors.Wrap(err, "Failed to connect to VM")
 	}
 	defer qmp.Shutdown()
 
 	err = qmp.ExecuteQMPCapabilities(ctx)
 	if err != nil {
-		return fmt.Errorf("Unable to query QEMU caps : %v", err)
+		return errors.Wrap(err, "Unable to query QEMU caps")
 	}
 
 	err = cmd(ctx, qmp)
 	if err != nil {
-		return fmt.Errorf("Unable to execute vm command : %v", err)
+		return errors.Wrap(err, "Unable to execute vm command")
 	}
 
 	return nil
@@ -251,7 +252,7 @@ func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *wo
 
 	qmp, _, err := qemu.QMPStart(ctx, socket, qemu.QMPConfig{}, disconnectedCh)
 	if err != nil {
-		return fmt.Errorf("Unable to connect to VM : %v", err)
+		return errors.Wrap(err, "Unable to connect to VM")
 	}
 
 	qemuShutdown := true
@@ -272,7 +273,7 @@ func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *wo
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ws.HTTPServerPort))
 	if err != nil {
-		return fmt.Errorf("Unable to create listener: %v", err)
+		return errors.Wrap(err, "Unable to create listener")
 	}
 
 	errCh := make(chan error)

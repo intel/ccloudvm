@@ -36,3 +36,7 @@
 [[constraint]]
   name = "github.com/spf13/cobra"
   revision = "b95ab734e27d33e0d8fbabf71ca990568d4e2020"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
