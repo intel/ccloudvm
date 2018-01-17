@@ -19,7 +19,9 @@ package ccvm
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 )
 
 const xenialWorkloadSpecNoVM = `
@@ -51,7 +53,7 @@ vm:
 var mockVMSpec = VMSpec{
 	MemGiB:       3,
 	CPUs:         2,
-	DiskGiB:      60,
+	DiskGiB:      defaultRootFSSize,
 	PortMappings: []portMapping{{Host: 10022, Guest: 22}},
 	Mounts:       []mount{},
 }
@@ -62,7 +64,27 @@ const sampleCloudInit = `
 const sampleWorkload3Docs = "---\n" + xenialWorkloadSpecNoVM + "...\n---\n" + sampleVMSpec + "...\n---\n" + sampleCloudInit + "...\n"
 const sampleWorkload = "---\n" + xenialWorkloadSpec + "...\n---\n" + sampleCloudInit + "...\n"
 
-func createMockWorkSpaceWithWorkload(workload, ccvmDir string) (*workspace, error) {
+func createMockWorkSpaceWithWorkload(workload, workloadName, ccvmDir string) (*workspace, error) {
+	workloadDir := filepath.Join(ccvmDir, "workloads")
+	err := os.MkdirAll(workloadDir, 0750)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create directory %s: %v", workloadDir, err)
+	}
+
+	ws := &workspace{
+		ccvmDir: ccvmDir,
+	}
+
+	workloadFile := path.Join(workloadDir, workloadName+".yaml")
+	err = ioutil.WriteFile(workloadFile, []byte(workload), 0640)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write workload file %s: %v", workloadFile, err)
+	}
+
+	return ws, nil
+}
+
+func createMockWorkSpaceWithInstance(workload, ccvmDir string) (*workspace, error) {
 	instanceDir, err := ioutil.TempDir(ccvmDir, "wkl-")
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create directory %s: %v", instanceDir, err)

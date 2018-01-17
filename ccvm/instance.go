@@ -36,6 +36,8 @@ const (
 	CLEARCONTAINERS = "clearcontainers"
 )
 
+const defaultRootFSSize = 60
+
 // Constants for the Guest image used by ccloudvm
 
 const (
@@ -167,7 +169,7 @@ func (in *VMSpec) unmarshal(data []byte) error {
 	}
 
 	if in.DiskGiB == 0 {
-		in.DiskGiB = 60
+		in.DiskGiB = defaultRootFSSize
 	}
 
 	var i int
