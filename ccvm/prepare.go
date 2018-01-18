@@ -29,7 +29,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/ciao-project/ciao/osprepare"
 	"github.com/ciao-project/ciao/uuid"
 	"github.com/intel/ccloudvm/types"
 	"github.com/intel/govmm/qemu"
@@ -96,10 +95,6 @@ func (w *workspace) MountPath(tag string) string {
 	}
 
 	return ""
-}
-
-func installDeps(ctx context.Context) {
-	osprepare.InstallDeps(ctx, ccloudvmDeps, logger{})
 }
 
 func hostSupportsNestedKVMIntel() bool {

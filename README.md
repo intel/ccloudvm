@@ -12,18 +12,30 @@ installed on your machine is:
 
 - Go 1.8 or greater
 
-Then simply type
+The installation instructions for the latest version of Go can be
+found [here](https://golang.org/doc/install).  Once installed, ensure
+that your PATH environment variable contains the location of
+executables built with the Go tool chain.  This can be done by
+executing the following command.
+
+```
+$ export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+Then, to create a new Ubuntu 16.04 VM, simply type
 
 ```
 go get github.com/intel/ccloudvm
-$GOPATH/bin/ccloudvm create xenial
+ccloudvm setup
+ccloudvm create xenial
 ```
 
-to create a new Ubuntu 16.04 VM.  ccloudvm will install some needed
-dependencies on your local PC such as qemu and xorriso. It will then
-download an Ubuntu Cloud Image and create a VM based on this image.
-It will boot the VM, create an account for you, with the same
-name as your account on your host, and optionally update the default
+The go get command downloads, builds and installs ccloudvm.  The
+ccloudvm setup command installs some needed dependencies on your
+local PC such as qemu and xorriso. The ccloudvm create command
+downloads an Ubuntu Cloud Image and creates a VM based on this
+image.  It then boots the VM, creates an account for you, with the same
+name as your account on your host, and optionally updates the default
 packages.
 
 Once it's finished you'll be able to connect to the the VM via SSH

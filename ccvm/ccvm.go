@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ciao-project/ciao/osprepare"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
@@ -67,6 +68,13 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 	return wkld, ws, nil
 }
 
+// Setup Installs dependencies
+func Setup(ctx context.Context) error {
+	fmt.Println("Installing host dependencies")
+	osprepare.InstallDeps(ctx, ccloudvmDeps, logger{})
+	return nil
+}
+
 // Create sets up the VM
 func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) error {
 	var err error
@@ -80,9 +88,6 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 	if err == nil {
 		return fmt.Errorf("instance already exists")
 	}
-
-	fmt.Println("Installing host dependencies")
-	installDeps(ctx)
 
 	err = os.MkdirAll(ws.instanceDir, 0755)
 	if err != nil {
