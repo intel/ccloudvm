@@ -115,7 +115,7 @@ base_image_url: https://cloud-images.ubuntu.com/xenial/current/xenial-server-clo
 base_image_name: Ubuntu 16.04
 ...
 ---
-mem_gib: 2
+mem_mib: 2048
 cpus: 2
 ...
 ---
@@ -178,7 +178,7 @@ The second document is called the instance data document.  It contains informati
 set when an instance is first created but may be modified at a later date, without deleting
 the instance.    Four fields are currently defined:
 
-- mem_gib : Number of Gigabytes to assign to the VM.  Defaults to half the memory on your machine
+- mem_mib : Number of mebibytes to assign to the VM.  Defaults to half the memory on your machine
 - cpus    : Number of CPUs to assign to the VM.  Defaults to half the cores on your machine
 - ports   : Slice of port objects which map host ports on 127.0.0.1 to guest ports
 - mounts  : Slice of mount objects which describe the folders shared between the host and the guest

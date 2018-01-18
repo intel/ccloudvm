@@ -101,7 +101,7 @@ func (d *drives) Set(value string) error {
 
 // VMFlags provides common flags for customising a workload
 func VMFlags(fs *flag.FlagSet, customSpec *VMSpec) {
-	fs.IntVar(&customSpec.MemGiB, "mem", customSpec.MemGiB, "Gigabytes of RAM allocated to VM")
+	fs.IntVar(&customSpec.MemMiB, "mem", customSpec.MemMiB, "Mebibytes of RAM allocated to VM")
 	fs.IntVar(&customSpec.CPUs, "cpus", customSpec.CPUs, "VCPUs assigned to VM")
 	fs.Var(&customSpec.Mounts, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
 	fs.Var(&customSpec.Drives, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
@@ -223,7 +223,7 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
-	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", spec.MemGiB, spec.CPUs)
+	fmt.Printf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs)
 
 	err = bootVM(ctx, ws, &spec)
 	if err != nil {
@@ -259,9 +259,9 @@ func Start(ctx context.Context, customSpec *VMSpec) error {
 		return err
 	}
 
-	memGiB, CPUs := getMemAndCpus()
-	if in.MemGiB == 0 {
-		in.MemGiB = memGiB
+	memMiB, CPUs := getMemAndCpus()
+	if in.MemMiB == 0 {
+		in.MemMiB = memMiB
 	}
 	if in.CPUs == 0 {
 		in.CPUs = CPUs
@@ -275,7 +275,7 @@ func Start(ctx context.Context, customSpec *VMSpec) error {
 		fmt.Printf("Warning: Failed to update instance state: %v", err)
 	}
 
-	fmt.Printf("Booting VM with %d GB RAM and %d cpus\n", in.MemGiB, in.CPUs)
+	fmt.Printf("Booting VM with %d MiB RAM and %d cpus\n", in.MemMiB, in.CPUs)
 
 	err = bootVM(ctx, ws, in)
 	if err != nil {

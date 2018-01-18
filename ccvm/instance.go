@@ -78,7 +78,7 @@ func (d drive) String() string {
 
 // VMSpec holds the per-VM state.
 type VMSpec struct {
-	MemGiB       int    `yaml:"mem_gib"`
+	MemMiB       int    `yaml:"mem_mib"`
 	DiskGiB      int    `yaml:"disk_gib"`
 	CPUs         int    `yaml:"cpus"`
 	PortMappings ports  `yaml:"ports"`
@@ -159,10 +159,10 @@ func (in *VMSpec) unmarshal(data []byte) error {
 	}
 
 	var memDef, cpuDef int
-	if in.MemGiB == 0 || in.CPUs == 0 {
+	if in.MemMiB == 0 || in.CPUs == 0 {
 		memDef, cpuDef = getMemAndCpus()
-		if in.MemGiB == 0 {
-			in.MemGiB = memDef
+		if in.MemMiB == 0 {
+			in.MemMiB = memDef
 		}
 		if in.CPUs == 0 {
 			in.CPUs = cpuDef
@@ -264,8 +264,8 @@ func (in *VMSpec) mergeCustom(customSpec *VMSpec) error {
 		}
 	}
 
-	if customSpec.MemGiB != 0 {
-		in.MemGiB = customSpec.MemGiB
+	if customSpec.MemMiB != 0 {
+		in.MemMiB = customSpec.MemMiB
 	}
 	if customSpec.CPUs != 0 {
 		in.CPUs = customSpec.CPUs

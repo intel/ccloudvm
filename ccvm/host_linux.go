@@ -24,7 +24,6 @@ func getOnlineCPUs() int {
 
 func getTotalMemory() int {
 	total, _ := deviceinfo.GetMemoryInfo()
-	total /= 1024
 	return total
 }
 
@@ -38,9 +37,9 @@ func getMemAndCpus() (mem int, cpus int) {
 
 	mem = getTotalMemory() / 2
 	if mem < 0 {
-		mem = 1
+		mem = 1024
 	} else if mem > 8 {
-		mem = 8
+		mem = 8192
 	}
 
 	return mem, cpus
