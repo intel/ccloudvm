@@ -52,7 +52,7 @@ func bootVM(ctx context.Context, ws *workspace, in *VMSpec) error {
 
 	vmImage := path.Join(ws.instanceDir, "image.qcow2")
 	isoPath := path.Join(ws.instanceDir, "config.iso")
-	memParam := fmt.Sprintf("%dG", in.MemGiB)
+	memParam := fmt.Sprintf("%dM", in.MemMiB)
 	CPUsParam := fmt.Sprintf("cpus=%d", in.CPUs)
 	args := []string{
 		"-qmp", fmt.Sprintf("unix:%s,server,nowait", socket),

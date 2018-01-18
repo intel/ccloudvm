@@ -31,7 +31,7 @@ base_image_name: ` + guestImageFriendlyName + `
 `
 
 const sampleVMSpec = `
-mem_gib: 3
+mem_mib: 3072
 cpus: 2
 ports:
 - host: 10022
@@ -43,7 +43,7 @@ const xenialWorkloadSpec = `
 base_image_url: ` + guestDownloadURL + `
 base_image_name: ` + guestImageFriendlyName + `
 vm:
-  mem_gib: 3
+  mem_mib: 3072
   cpus: 2
   ports:
   - host: 10022
@@ -52,7 +52,7 @@ vm:
 `
 
 var mockVMSpec = VMSpec{
-	MemGiB:       3,
+	MemMiB:       3072,
 	CPUs:         2,
 	DiskGiB:      defaultRootFSSize,
 	PortMappings: []portMapping{{Host: 10022, Guest: 22}},
