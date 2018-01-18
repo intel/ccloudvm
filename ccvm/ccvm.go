@@ -383,8 +383,8 @@ func waitForSSH(ctx context.Context) (*workspace, int, error) {
 	return ws, sshPort, nil
 }
 
-// Connect to the VM via SSH
-func Connect(ctx context.Context) error {
+// Run connects to the VM via SSH and runs the desired command
+func Run(ctx context.Context, command string) error {
 	path, err := exec.LookPath("ssh")
 	if err != nil {
 		return fmt.Errorf("Unable to locate ssh binary")
@@ -395,15 +395,27 @@ func Connect(ctx context.Context) error {
 		return err
 	}
 
-	err = syscall.Exec(path, []string{path,
+	args := []string{
+		path,
 		"-q", "-F", "/dev/null",
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "IdentitiesOnly=yes",
 		"-i", ws.keyPath,
-		"127.0.0.1", "-p", strconv.Itoa(sshPort)},
-		os.Environ())
+		"127.0.0.1", "-p", strconv.Itoa(sshPort),
+	}
+
+	if command != "" {
+		args = append(args, command)
+	}
+
+	err = syscall.Exec(path, args, os.Environ())
 	return err
+}
+
+// Connect opens a shell to the VM via
+func Connect(ctx context.Context) error {
+	return Run(ctx, "")
 }
 
 // Delete the VM

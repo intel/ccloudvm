@@ -103,6 +103,11 @@ func TestSystem(t *testing.T) {
 		t.Errorf("Instance not available via SSH: %v", err)
 	}
 
+	err = Run(ctx, "echo $PATH")
+	if err != nil {
+		t.Errorf("Failed to run test command via SSH")
+	}
+
 	err = Quit(ctx)
 	if err != nil {
 		t.Errorf("Failed to Restart instance: %v", err)
