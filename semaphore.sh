@@ -75,12 +75,9 @@ echo ""
 echo "===== Testing SSH ====="
 echo ""
 
-myssh=`ccloudvm status | grep ssh`
-mysshcmd=`echo $myssh | cut -d : -f 2`
-
 # SSH to the instance and execute a command to determine the remote user
 
-lsb_release_cmd="$mysshcmd lsb_release -c -s"
+lsb_release_cmd="ccloudvm run -- lsb_release -c -s"
 remote_distro=`$lsb_release_cmd`
 echo "Check $remote_distro == xenial"
 test $remote_distro = "xenial"
