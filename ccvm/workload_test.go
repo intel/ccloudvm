@@ -114,7 +114,7 @@ func TestCreateWorkload(t *testing.T) {
 			if workload.spec.VM.CPUs == 0 {
 				t.Errorf("CPUs should be greater than 0")
 			}
-			if workload.spec.VM.MemGiB == 0 {
+			if workload.spec.VM.MemMiB == 0 {
 				t.Errorf("Memory should be greater than 0")
 			}
 			if len(workload.spec.VM.PortMappings) == 0 {

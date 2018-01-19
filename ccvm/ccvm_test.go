@@ -67,7 +67,7 @@ func TestSystem(t *testing.T) {
 	}()
 
 	vmSpec := &VMSpec{
-		MemGiB: 1,
+		MemMiB: 1024,
 		CPUs:   1,
 		Mounts: []mount{
 			{
