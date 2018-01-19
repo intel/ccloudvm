@@ -125,16 +125,8 @@ func TestCreateWorkload(t *testing.T) {
 }
 
 func TestRestoreWorkload(t *testing.T) {
-	tests := []struct {
-		checkSpec bool // Should we check the workload.spec content?
-		workload  string
-	}{
-		// 1 document: per-VM data (legacy)
-		{workload: sampleVMSpec},
-		// 2 documents: spec, cloud init file
-		{workload: sampleWorkload, checkSpec: true},
-		// 3 documents: spec, per-VM data, cloud init file (legacy)
-		{workload: sampleWorkload3Docs, checkSpec: true},
+	workloads := []string{
+		sampleWorkload,
 	}
 
 	ccvmDir, err := ioutil.TempDir("", "ccloudvm-tests-")
@@ -148,10 +140,8 @@ func TestRestoreWorkload(t *testing.T) {
 		}
 	}()
 
-	for i := range tests {
-		test := &tests[i]
-
-		ws, err := createMockWorkSpaceWithInstance(test.workload, ccvmDir)
+	for i := range workloads {
+		ws, err := createMockWorkSpaceWithInstance(workloads[i], ccvmDir)
 		if err != nil {
 			t.Errorf("Failed to create mock workload : %v", err)
 			continue
@@ -168,19 +158,18 @@ func TestRestoreWorkload(t *testing.T) {
 			continue
 		}
 
-		if test.checkSpec {
-			if guestDownloadURL != workload.spec.BaseImageURL {
-				t.Errorf("URLs do not match expected %s got %s",
-					guestDownloadURL, workload.spec.BaseImageURL)
-			}
-			if guestImageFriendlyName != workload.spec.BaseImageName {
-				t.Errorf("Names do not match expected %s got %s",
-					guestImageFriendlyName, workload.spec.BaseImageName)
-			}
-			if defaultHostname != workload.spec.Hostname {
-				t.Errorf("Hostnames do not match expected %s got %s",
-					defaultHostname, workload.spec.Hostname)
-			}
+		if guestDownloadURL != workload.spec.BaseImageURL {
+			t.Errorf("URLs do not match expected %s got %s",
+				guestDownloadURL, workload.spec.BaseImageURL)
 		}
+		if guestImageFriendlyName != workload.spec.BaseImageName {
+			t.Errorf("Names do not match expected %s got %s",
+				guestImageFriendlyName, workload.spec.BaseImageName)
+		}
+		if defaultHostname != workload.spec.Hostname {
+			t.Errorf("Hostnames do not match expected %s got %s",
+				defaultHostname, workload.spec.Hostname)
+		}
+
 	}
 }

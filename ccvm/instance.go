@@ -19,22 +19,12 @@ package ccvm
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/url"
-	"path"
-	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
-)
-
-// Different types of virtual development environments
-// we support.
-const (
-	CIAO            = "ciao"
-	CLEARCONTAINERS = "clearcontainers"
 )
 
 const defaultRootFSSize = 60
@@ -94,55 +84,6 @@ type workloadSpec struct {
 	WorkloadName  string `yaml:"workload"`
 	NeedsNestedVM bool   `yaml:"needs_nested_vm"`
 	VM            VMSpec `yaml:"vm"`
-}
-
-// This function creates a default instanceData object for legacy ciao-down
-// ciao VMs.  These old VMs did not store information about mounts and
-// mapped ports as this information was hard-coded into ccloudvm itself.
-// Consequently, when migrating one of these old VMs we need to fill in
-// the missing information.
-func (in *VMSpec) loadLegacyInstance(ws *workspace) error {
-	// Check for legacy state files.
-
-	data, err := ioutil.ReadFile(path.Join(ws.instanceDir, "vmtype.txt"))
-	if err == nil {
-		vmType := string(data)
-		if vmType != CIAO && vmType != CLEARCONTAINERS {
-			err := fmt.Errorf("Unsupported vmType %s. Should be one of "+CIAO+"|"+CLEARCONTAINERS, vmType)
-			return err
-		}
-	}
-
-	uiPath := ""
-	data, err = ioutil.ReadFile(path.Join(ws.instanceDir, "ui_path.txt"))
-	if err == nil {
-		uiPath = string(data)
-	}
-
-	in.Mounts = []mount{
-		{
-			Tag:           "hostgo",
-			SecurityModel: "passthrough",
-			Path:          ws.GoPath,
-		},
-	}
-
-	in.PortMappings = []portMapping{
-		{
-			Host:  10022,
-			Guest: 22,
-		},
-	}
-
-	if uiPath != "" {
-		in.Mounts = append(in.Mounts, mount{
-			Tag:           "hostui",
-			SecurityModel: "mapped",
-			Path:          filepath.Clean(uiPath),
-		})
-	}
-
-	return nil
 }
 
 func (in *VMSpec) unmarshal(data []byte) error {
