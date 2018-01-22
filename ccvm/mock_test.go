@@ -25,20 +25,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const xenialWorkloadSpecNoVM = `
-base_image_url: ` + guestDownloadURL + `
-base_image_name: ` + guestImageFriendlyName + `
-`
-
-const sampleVMSpec = `
-mem_mib: 3072
-cpus: 2
-ports:
-- host: 10022
-  guest: 22
-mounts: []
-`
-
 const xenialWorkloadSpec = `
 base_image_url: ` + guestDownloadURL + `
 base_image_name: ` + guestImageFriendlyName + `
@@ -62,7 +48,6 @@ var mockVMSpec = VMSpec{
 const sampleCloudInit = `
 `
 
-const sampleWorkload3Docs = "---\n" + xenialWorkloadSpecNoVM + "...\n---\n" + sampleVMSpec + "...\n---\n" + sampleCloudInit + "...\n"
 const sampleWorkload = "---\n" + xenialWorkloadSpec + "...\n---\n" + sampleCloudInit + "...\n"
 
 func createMockWorkSpaceWithWorkload(workload, workloadName, ccvmDir string) (*workspace, error) {

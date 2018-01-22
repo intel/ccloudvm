@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 
@@ -140,15 +139,6 @@ func downloadFile(ctx context.Context, URL, ccvmDir string, cb progressCB) (stri
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return "", fmt.Errorf("Unable to create directory %s : %v",
 			cacheDir, err)
-	}
-
-	// Handles legacy code in which the ubuntu image used to be stored in
-	// the root of the ~/.ccloudvm directory.  We don't want to move the
-	// old image as this would break any existing VMs based off it.
-
-	oldImgPath := path.Join(ccvmDir, di.imageName)
-	if err := exec.Command("cp", oldImgPath, imgPath).Run(); err == nil {
-		return imgPath, nil
 	}
 
 	tmpImgPath := path.Join(cacheDir, di.imageTmpName)

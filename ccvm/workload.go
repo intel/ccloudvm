@@ -189,10 +189,7 @@ func restoreWorkload(ws *workspace) (*workload, error) {
 	var wkld workload
 	data, err := ioutil.ReadFile(path.Join(ws.instanceDir, "state.yaml"))
 	if err != nil {
-		if err = wkld.spec.VM.loadLegacyInstance(ws); err != nil {
-			return nil, err
-		}
-		return &wkld, nil
+		return nil, errors.Wrap(err, "Error reading workload")
 	}
 
 	docs := splitYaml(data)
