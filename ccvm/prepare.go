@@ -42,28 +42,6 @@ const metaDataTemplate = `
 }
 `
 
-type logger struct{}
-
-func (l logger) V(int32) bool {
-	return false
-}
-
-func (l logger) Infof(s string, args ...interface{}) {
-	out := fmt.Sprintf(s, args...)
-	fmt.Print(out)
-	if !strings.HasSuffix(out, "\n") {
-		fmt.Println()
-	}
-}
-
-func (l logger) Warningf(s string, args ...interface{}) {
-	l.Infof(s, args)
-}
-
-func (l logger) Errorf(s string, args ...interface{}) {
-	l.Infof(s, args)
-}
-
 type workspace struct {
 	GoPath         string
 	Home           string

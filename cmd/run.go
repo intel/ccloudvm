@@ -19,7 +19,7 @@ package cmd
 import (
 	"strings"
 
-	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/client"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ var runCmd = &cobra.Command{
 		defer cancelFunc()
 
 		command := strings.Join(args, " ")
-		return ccvm.Run(ctx, command)
+		return client.Run(ctx, command)
 	},
 }
 

@@ -20,12 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"strconv"
-	"syscall"
 	"time"
 
-	"github.com/ciao-project/ciao/osprepare"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
@@ -66,13 +62,6 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 	}
 
 	return wkld, ws, nil
-}
-
-// Setup Installs dependencies
-func Setup(ctx context.Context) error {
-	fmt.Println("Installing host dependencies")
-	osprepare.InstallDeps(ctx, ccloudvmDeps, logger{})
-	return nil
 }
 
 // Create sets up the VM
@@ -253,21 +242,22 @@ func Status(ctx context.Context) error {
 	return nil
 }
 
-func waitForSSH(ctx context.Context) (*workspace, int, error) {
+// WaitForSSH blocks until an instance is ready to receive SSH connections
+func WaitForSSH(ctx context.Context) (string, int, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return nil, 0, err
+		return "", 0, err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "Unable to load instance state")
+		return "", 0, errors.Wrap(err, "Unable to load instance state")
 	}
 	in := &wkld.spec.VM
 
 	sshPort, err := in.SSHPort()
 	if err != nil {
-		return nil, 0, err
+		return "", 0, err
 	}
 
 	if !sshReady(ctx, sshPort) {
@@ -277,7 +267,7 @@ func waitForSSH(ctx context.Context) (*workspace, int, error) {
 			select {
 			case <-time.After(time.Second):
 			case <-ctx.Done():
-				return nil, 0, fmt.Errorf("Cancelled")
+				return "", 0, fmt.Errorf("Cancelled")
 			}
 
 			if sshReady(ctx, sshPort) {
@@ -289,42 +279,7 @@ func waitForSSH(ctx context.Context) (*workspace, int, error) {
 		fmt.Println()
 	}
 
-	return ws, sshPort, nil
-}
-
-// Run connects to the VM via SSH and runs the desired command
-func Run(ctx context.Context, command string) error {
-	path, err := exec.LookPath("ssh")
-	if err != nil {
-		return fmt.Errorf("Unable to locate ssh binary")
-	}
-
-	ws, sshPort, err := waitForSSH(ctx)
-	if err != nil {
-		return err
-	}
-
-	args := []string{
-		path,
-		"-q", "-F", "/dev/null",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "IdentitiesOnly=yes",
-		"-i", ws.keyPath,
-		"127.0.0.1", "-p", strconv.Itoa(sshPort),
-	}
-
-	if command != "" {
-		args = append(args, command)
-	}
-
-	err = syscall.Exec(path, args, os.Environ())
-	return err
-}
-
-// Connect opens a shell to the VM via
-func Connect(ctx context.Context) error {
-	return Run(ctx, "")
+	return ws.keyPath, sshPort, nil
 }
 
 // Delete the VM

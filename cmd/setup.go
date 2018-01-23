@@ -17,7 +17,7 @@
 package cmd
 
 import (
-	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/client"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ var setupCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
-		return ccvm.Setup(ctx)
+		return client.Setup(ctx)
 	},
 }
 

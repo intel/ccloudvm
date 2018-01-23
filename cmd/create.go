@@ -19,7 +19,7 @@ package cmd
 import (
 	"flag"
 
-	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/client"
 	"github.com/intel/ccloudvm/types"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +38,7 @@ var createCmd = &cobra.Command{
 		defer cancelFunc()
 
 		mergeVMOptions(&createSpec, &createMOptsSpec)
-		return ccvm.Create(ctx, args[0], createDebug, createPackageUpgrade, &createSpec)
+		return client.Create(ctx, args[0], createDebug, createPackageUpgrade, &createSpec)
 	},
 }
 

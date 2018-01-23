@@ -17,7 +17,7 @@
 package cmd
 
 import (
-	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/client"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +28,7 @@ var deleteCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
-		return ccvm.Delete(ctx)
+		return client.Delete(ctx)
 	},
 }
 
