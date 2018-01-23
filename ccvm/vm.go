@@ -30,6 +30,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/intel/ccloudvm/types"
 	"github.com/intel/govmm/qemu"
 	"github.com/pkg/errors"
 )
@@ -41,7 +42,7 @@ const (
 	urlParam          = "url"
 )
 
-func bootVM(ctx context.Context, ws *workspace, in *VMSpec) error {
+func bootVM(ctx context.Context, ws *workspace, in *types.VMSpec) error {
 	disconnectedCh := make(chan struct{})
 	socket := path.Join(ws.instanceDir, "socket")
 	qmp, _, err := qemu.QMPStart(ctx, socket, qemu.QMPConfig{}, disconnectedCh)

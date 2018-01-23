@@ -18,119 +18,18 @@ package ccvm
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
+	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
 
-type mounts []mount
-
-func (m *mounts) String() string {
-	return fmt.Sprint(*m)
-}
-
-func (m *mounts) Set(value string) error {
-	components := strings.Split(value, ",")
-	if len(components) != 3 {
-		return fmt.Errorf("--mount parameter should be of format tag,security_model,path")
-	}
-	*m = append(*m, mount{
-		Tag:           components[0],
-		SecurityModel: components[1],
-		Path:          components[2],
-	})
-	return nil
-}
-
-type ports []portMapping
-
-func (p *ports) String() string {
-	return fmt.Sprint(*p)
-}
-
-func (p *ports) Set(value string) error {
-	components := strings.Split(value, "-")
-	if len(components) != 2 {
-		return fmt.Errorf("--port parameter should be of format host-guest")
-	}
-	host, err := strconv.Atoi(components[0])
-	if err != nil {
-		return fmt.Errorf("host port must be a number")
-	}
-	guest, err := strconv.Atoi(components[1])
-	if err != nil {
-		return fmt.Errorf("guest port must be a number")
-	}
-	*p = append(*p, portMapping{
-		Host:  host,
-		Guest: guest,
-	})
-	return nil
-}
-
-type drives []drive
-
-func (d *drives) String() string {
-	return fmt.Sprint(*d)
-}
-
-func (d *drives) Set(value string) error {
-	components := strings.Split(value, ",")
-	if len(components) < 2 {
-		return fmt.Errorf("--drive parameter should be of format path,format[,option]*")
-	}
-	_, err := os.Stat(components[0])
-	if err != nil {
-		return errors.Wrapf(err, "Unable to access %s", components[1])
-	}
-	*d = append(*d, drive{
-		Path:    components[0],
-		Format:  components[1],
-		Options: strings.Join(components[2:], ","),
-	})
-	return nil
-}
-
-// VMFlags provides common flags for customising a workload
-func VMFlags(fs *flag.FlagSet, customSpec *VMSpec) {
-	fs.IntVar(&customSpec.MemMiB, "mem", customSpec.MemMiB, "Mebibytes of RAM allocated to VM")
-	fs.IntVar(&customSpec.CPUs, "cpus", customSpec.CPUs, "VCPUs assigned to VM")
-	fs.Var(&customSpec.Mounts, "mount", "directory to mount in guest VM via 9p. Format is tag,security_model,path")
-	fs.Var(&customSpec.Drives, "drive", "Host accessible resource to appear as block device in guest VM.  Format is path,format[,option]*")
-	fs.Var(&customSpec.PortMappings, "port", "port mapping. Format is host_port-guest_port, e.g., -port 10022-22")
-	fs.UintVar(&customSpec.Qemuport, "qemuport", customSpec.Qemuport, "Port to follow qemu logs of the guest machine, eg., --qemuport=9999")
-}
-
-func checkDirectory(dir string) error {
-	if dir == "" {
-		return nil
-	}
-
-	if !path.IsAbs(dir) {
-		return fmt.Errorf("%s is not an absolute path", dir)
-	}
-
-	fi, err := os.Stat(dir)
-	if err != nil {
-		return errors.Wrapf(err, "Unable to stat %s", dir)
-	}
-
-	if !fi.IsDir() {
-		return fmt.Errorf("%s is not a directory", dir)
-	}
-
-	return nil
-}
-
-func prepareCreate(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) (*workload, *workspace, error) {
+func prepareCreate(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) (*workload, *workspace, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -143,7 +42,7 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 
 	in := &wkld.spec.VM
 
-	err = in.mergeCustom(customSpec)
+	err = in.MergeCustom(customSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -169,7 +68,7 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 }
 
 // Create sets up the VM
-func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *VMSpec) error {
+func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) error {
 	var err error
 
 	wkld, ws, err := prepareCreate(ctx, workloadName, debug, update, customSpec)
@@ -242,7 +141,7 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 }
 
 // Start launches the VM
-func Start(ctx context.Context, customSpec *VMSpec) error {
+func Start(ctx context.Context, customSpec *types.VMSpec) error {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		return err
@@ -254,7 +153,7 @@ func Start(ctx context.Context, customSpec *VMSpec) error {
 	}
 	in := &wkld.spec.VM
 
-	err = in.mergeCustom(customSpec)
+	err = in.MergeCustom(customSpec)
 	if err != nil {
 		return err
 	}
@@ -334,7 +233,7 @@ func Status(ctx context.Context) error {
 	}
 	in := &wkld.spec.VM
 
-	sshPort, err := in.sshPort()
+	sshPort, err := in.SSHPort()
 	if err != nil {
 		return fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
 	}
@@ -356,7 +255,7 @@ func waitForSSH(ctx context.Context) (*workspace, int, error) {
 	}
 	in := &wkld.spec.VM
 
-	sshPort, err := in.sshPort()
+	sshPort, err := in.SSHPort()
 	if err != nil {
 		return nil, 0, err
 	}

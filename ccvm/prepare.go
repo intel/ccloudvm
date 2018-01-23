@@ -31,6 +31,7 @@ import (
 
 	"github.com/ciao-project/ciao/osprepare"
 	"github.com/ciao-project/ciao/uuid"
+	"github.com/intel/ccloudvm/types"
 	"github.com/intel/govmm/qemu"
 	"github.com/pkg/errors"
 )
@@ -77,7 +78,7 @@ type workspace struct {
 	HTTPServerPort int
 	GitUserName    string
 	GitEmail       string
-	Mounts         []mount
+	Mounts         []types.Mount
 	Hostname       string
 	UUID           string
 	PackageUpgrade string

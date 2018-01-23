@@ -20,10 +20,12 @@ import (
 	"flag"
 
 	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/types"
 	"github.com/spf13/cobra"
 )
 
-var startSpec ccvm.VMSpec
+var startSpec types.VMSpec
+var startMOptsSpec multiOptions
 
 var startCmd = &cobra.Command{
 	Use:   "start",
@@ -32,6 +34,7 @@ var startCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
+		mergeVMOptions(&startSpec, &startMOptsSpec)
 		return ccvm.Start(ctx, &startSpec)
 	},
 }
@@ -40,7 +43,7 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 
 	var flags flag.FlagSet
-	ccvm.VMFlags(&flags, &startSpec)
+	vmFlags(&flags, &startSpec, &startMOptsSpec)
 
 	startCmd.Flags().AddGoFlagSet(&flags)
 }
