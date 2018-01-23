@@ -212,7 +212,8 @@ func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
 func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 	errCh chan error) {
 	finished := false
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var b bytes.Buffer
 		_, err := io.Copy(&b, r.Body)
 		if err != nil {
@@ -232,11 +233,13 @@ func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 		}
 	})
 
-	http.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
 		serveLocalFile(ctx, ccvmDir, w, r)
 	})
 
-	server := &http.Server{}
+	server := &http.Server{
+		Handler: mux,
+	}
 	go func() {
 		_ = server.Serve(listener)
 		if finished {
