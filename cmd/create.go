@@ -20,10 +20,12 @@ import (
 	"flag"
 
 	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/types"
 	"github.com/spf13/cobra"
 )
 
-var createSpec ccvm.VMSpec
+var createSpec types.VMSpec
+var createMOptsSpec multiOptions
 var createDebug bool
 var createPackageUpgrade bool
 
@@ -35,6 +37,7 @@ var createCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
+		mergeVMOptions(&createSpec, &createMOptsSpec)
 		return ccvm.Create(ctx, args[0], createDebug, createPackageUpgrade, &createSpec)
 	},
 }
@@ -43,7 +46,7 @@ func init() {
 	rootCmd.AddCommand(createCmd)
 
 	var flags flag.FlagSet
-	ccvm.VMFlags(&flags, &createSpec)
+	vmFlags(&flags, &createSpec, &createMOptsSpec)
 	flags.IntVar(&createSpec.DiskGiB, "disk", createSpec.DiskGiB, "Gibibytes of disk space allocated to Rootfs")
 
 	createCmd.Flags().AddGoFlagSet(&flags)

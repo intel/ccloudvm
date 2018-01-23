@@ -23,6 +23,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -37,63 +38,23 @@ const (
 	defaultHostname        = "singlevm"
 )
 
-type portMapping struct {
-	Host  int `yaml:"host"`
-	Guest int `yaml:"guest"`
-}
-
-func (p portMapping) String() string {
-	return fmt.Sprintf("%d-%d", p.Host, p.Guest)
-}
-
-type mount struct {
-	Tag           string `yaml:"tag"`
-	SecurityModel string `yaml:"security_model"`
-	Path          string `yaml:"path"`
-}
-
-func (m mount) String() string {
-	return fmt.Sprintf("%s,%s,%s", m.Tag, m.SecurityModel, m.Path)
-}
-
-type drive struct {
-	Path    string
-	Format  string
-	Options string
-}
-
-func (d drive) String() string {
-	return fmt.Sprintf("%s,%s,%s", d.Path, d.Format, d.Options)
-}
-
-// VMSpec holds the per-VM state.
-type VMSpec struct {
-	MemMiB       int    `yaml:"mem_mib"`
-	DiskGiB      int    `yaml:"disk_gib"`
-	CPUs         int    `yaml:"cpus"`
-	PortMappings ports  `yaml:"ports"`
-	Mounts       mounts `yaml:"mounts"`
-	Drives       drives `yaml:"drives"`
-	Qemuport     uint   `yaml:"qemuport"`
-}
-
 type workloadSpec struct {
-	BaseImageURL  string `yaml:"base_image_url"`
-	BaseImageName string `yaml:"base_image_name"`
-	Hostname      string `yaml:"hostname"`
-	WorkloadName  string `yaml:"workload"`
-	NeedsNestedVM bool   `yaml:"needs_nested_vm"`
-	VM            VMSpec `yaml:"vm"`
+	BaseImageURL  string       `yaml:"base_image_url"`
+	BaseImageName string       `yaml:"base_image_name"`
+	Hostname      string       `yaml:"hostname"`
+	WorkloadName  string       `yaml:"workload"`
+	NeedsNestedVM bool         `yaml:"needs_nested_vm"`
+	VM            types.VMSpec `yaml:"vm"`
 }
 
-func (in *VMSpec) unmarshal(data []byte) error {
+func unmarshal(in *types.VMSpec, data []byte) error {
 	err := yaml.Unmarshal(data, in)
 	if err != nil {
 		return errors.Wrap(err, "Unable to unmarshal instance state")
 	}
 
 	for i := range in.Mounts {
-		if err := checkDirectory(in.Mounts[i].Path); err != nil {
+		if err := types.CheckDirectory(in.Mounts[i].Path); err != nil {
 			return fmt.Errorf("Bad mount %s specified: %v",
 				in.Mounts[i].Path, err)
 		}
@@ -122,7 +83,7 @@ func (in *VMSpec) unmarshal(data []byte) error {
 	}
 	if i == len(in.PortMappings) {
 		in.PortMappings = append(in.PortMappings,
-			portMapping{
+			types.PortMapping{
 				Host:  10022,
 				Guest: 22,
 			})
@@ -131,7 +92,7 @@ func (in *VMSpec) unmarshal(data []byte) error {
 	return nil
 }
 
-func (in *VMSpec) unmarshalWithTemplate(ws *workspace, data string) error {
+func unmarshalWithTemplate(in *types.VMSpec, ws *workspace, data string) error {
 	tmpl, err := template.New("instance-data").Parse(string(data))
 	if err != nil {
 		return errors.Wrap(err, "Unable to parse instance data template")
@@ -141,97 +102,7 @@ func (in *VMSpec) unmarshalWithTemplate(ws *workspace, data string) error {
 	if err != nil {
 		return errors.Wrap(err, "Unable to execute instance data template")
 	}
-	return in.unmarshal(buf.Bytes())
-}
-
-func (in *VMSpec) mergeMounts(m mounts) {
-	mountCount := len(in.Mounts)
-	for _, mount := range m {
-		var i int
-		for i = 0; i < mountCount; i++ {
-			if mount.Tag == in.Mounts[i].Tag {
-				break
-			}
-		}
-
-		if i == mountCount {
-			in.Mounts = append(in.Mounts, mount)
-		} else {
-			in.Mounts[i] = mount
-		}
-	}
-}
-
-func (in *VMSpec) mergePorts(p ports) {
-	portCount := len(in.PortMappings)
-	for _, port := range p {
-		var i int
-		for i = 0; i < portCount; i++ {
-			if port.Guest == in.PortMappings[i].Guest {
-				break
-			}
-		}
-
-		if i == portCount {
-			in.PortMappings = append(in.PortMappings, port)
-		} else {
-			in.PortMappings[i] = port
-		}
-	}
-}
-
-func (in *VMSpec) mergeDrives(d drives) {
-	driveCount := len(in.Drives)
-	for _, drive := range d {
-		var i int
-		for i = 0; i < driveCount; i++ {
-			if drive.Path == in.Drives[i].Path {
-				break
-			}
-		}
-
-		if i == driveCount {
-			in.Drives = append(in.Drives, drive)
-		} else {
-			in.Drives[i] = drive
-		}
-	}
-}
-
-func (in *VMSpec) mergeCustom(customSpec *VMSpec) error {
-	for i := range customSpec.Mounts {
-		if err := checkDirectory(customSpec.Mounts[i].Path); err != nil {
-			return err
-		}
-	}
-
-	if customSpec.MemMiB != 0 {
-		in.MemMiB = customSpec.MemMiB
-	}
-	if customSpec.CPUs != 0 {
-		in.CPUs = customSpec.CPUs
-	}
-	if customSpec.DiskGiB != 0 {
-		in.DiskGiB = customSpec.DiskGiB
-	}
-	if customSpec.Qemuport != 0 {
-		in.Qemuport = customSpec.Qemuport
-	}
-
-	in.mergeMounts(customSpec.Mounts)
-	in.mergePorts(customSpec.PortMappings)
-	in.mergeDrives(customSpec.Drives)
-
-	return nil
-}
-
-func (in *VMSpec) sshPort() (int, error) {
-	for _, p := range in.PortMappings {
-		if p.Guest == 22 {
-			return p.Host, nil
-		}
-	}
-	return 0, fmt.Errorf("No SSH port configured")
+	return unmarshal(in, buf.Bytes())
 }
 
 func (ins *workloadSpec) unmarshal(data []byte) error {

@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/intel/ccloudvm/types"
 )
 
 const standardTimeout = time.Second * 300
@@ -66,10 +68,10 @@ func TestSystem(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	vmSpec := &VMSpec{
+	vmSpec := &types.VMSpec{
 		MemMiB: 1024,
 		CPUs:   1,
-		Mounts: []mount{
+		Mounts: []types.Mount{
 			{
 				Tag:           "tmpdir",
 				SecurityModel: "passthrough",

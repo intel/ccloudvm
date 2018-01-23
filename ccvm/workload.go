@@ -143,7 +143,7 @@ func unmarshalWorkload(ws *workspace, wkld *workload, spec, VMData,
 		return err
 	}
 
-	err = wkld.spec.VM.unmarshalWithTemplate(ws, VMData)
+	err = unmarshalWithTemplate(&wkld.spec.VM, ws, VMData)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func restoreWorkload(ws *workspace) (*workload, error) {
 	if len(docs) == 1 {
 		// Older versions of ccloudvm just stored the VM data and not the
 		// entire workload.
-		if err = wkld.spec.VM.unmarshalWithTemplate(ws, string(docs[0])); err != nil {
+		if err = unmarshalWithTemplate(&wkld.spec.VM, ws, string(docs[0])); err != nil {
 			return nil, err
 		}
 		return &wkld, nil

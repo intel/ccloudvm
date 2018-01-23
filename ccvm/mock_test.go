@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
 
@@ -37,12 +38,12 @@ vm:
   mounts: []
 `
 
-var mockVMSpec = VMSpec{
+var mockVMSpec = types.VMSpec{
 	MemMiB:       3072,
 	CPUs:         2,
 	DiskGiB:      defaultRootFSSize,
-	PortMappings: []portMapping{{Host: 10022, Guest: 22}},
-	Mounts:       []mount{},
+	PortMappings: []types.PortMapping{{Host: 10022, Guest: 22}},
+	Mounts:       []types.Mount{},
 }
 
 const sampleCloudInit = `
