@@ -329,32 +329,10 @@ func proxyEnvFN(ws *workspace, indent int) string {
 	return buf.String()
 }
 
-func buildISOImage(ctx context.Context, instanceDir, tmpl string, ws *workspace, debug bool) error {
-	funcMap := template.FuncMap{
-		"proxyVars":    proxyVarsFN,
-		"proxyEnv":     proxyEnvFN,
-		"download":     downloadFN,
-		"beginTask":    beginTaskFN,
-		"endTaskCheck": endTaskCheckFN,
-		"endTaskOk":    endTaskOkFN,
-		"endTaskFail":  endTaskFailFN,
-		"finished":     finishedFN,
-	}
-
-	udt, err := template.New("user-data").Funcs(funcMap).Parse(tmpl)
-	if err != nil {
-		return errors.Wrap(err, "Unable to parse user data template")
-	}
-
+func buildISOImage(ctx context.Context, instanceDir string, userData []byte, ws *workspace, debug bool) error {
 	mdt, err := template.New("meta-data").Parse(metaDataTemplate)
 	if err != nil {
 		return errors.Wrap(err, "Unable to parse meta data template")
-	}
-
-	var udBuf bytes.Buffer
-	err = udt.Execute(&udBuf, ws)
-	if err != nil {
-		return errors.Wrap(err, "Unable to execute user data template")
 	}
 
 	var mdBuf bytes.Buffer
@@ -364,11 +342,11 @@ func buildISOImage(ctx context.Context, instanceDir, tmpl string, ws *workspace,
 	}
 
 	if debug {
-		fmt.Println(string(udBuf.Bytes()))
+		fmt.Println(string(userData))
 		fmt.Println(string(mdBuf.Bytes()))
 	}
 
-	return createCloudInitISO(ctx, instanceDir, udBuf.Bytes(), mdBuf.Bytes())
+	return createCloudInitISO(ctx, instanceDir, userData, mdBuf.Bytes())
 }
 
 func createRootfs(ctx context.Context, backingImage, instanceDir string, disk int) error {

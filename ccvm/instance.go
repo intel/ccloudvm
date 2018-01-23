@@ -45,6 +45,28 @@ type workloadSpec struct {
 	WorkloadName  string       `yaml:"workload"`
 	NeedsNestedVM bool         `yaml:"needs_nested_vm"`
 	VM            types.VMSpec `yaml:"vm"`
+	Inherits      string       `yaml:"inherits"`
+}
+
+func defaultVMSpec() types.VMSpec {
+	memDef, cpuDef := getMemAndCpus()
+
+	return types.VMSpec{
+		MemMiB:  memDef,
+		CPUs:    cpuDef,
+		DiskGiB: defaultRootFSSize,
+	}
+}
+
+func defaultWorkload() *workload {
+	return &workload{
+		spec: workloadSpec{
+			BaseImageName: guestImageFriendlyName,
+			BaseImageURL:  guestDownloadURL,
+			Hostname:      defaultHostname,
+			VM:            defaultVMSpec(),
+		},
+	}
 }
 
 func unmarshal(in *types.VMSpec, data []byte) error {
@@ -58,35 +80,6 @@ func unmarshal(in *types.VMSpec, data []byte) error {
 			return fmt.Errorf("Bad mount %s specified: %v",
 				in.Mounts[i].Path, err)
 		}
-	}
-
-	var memDef, cpuDef int
-	if in.MemMiB == 0 || in.CPUs == 0 {
-		memDef, cpuDef = getMemAndCpus()
-		if in.MemMiB == 0 {
-			in.MemMiB = memDef
-		}
-		if in.CPUs == 0 {
-			in.CPUs = cpuDef
-		}
-	}
-
-	if in.DiskGiB == 0 {
-		in.DiskGiB = defaultRootFSSize
-	}
-
-	var i int
-	for i = 0; i < len(in.PortMappings); i++ {
-		if in.PortMappings[i].Guest == 22 {
-			break
-		}
-	}
-	if i == len(in.PortMappings) {
-		in.PortMappings = append(in.PortMappings,
-			types.PortMapping{
-				Host:  10022,
-				Guest: 22,
-			})
 	}
 
 	return nil
@@ -111,28 +104,20 @@ func (ins *workloadSpec) unmarshal(data []byte) error {
 		return errors.Wrap(err, "Unable to unmarshal instance specification")
 	}
 
-	if ins.BaseImageURL == "" {
-		ins.BaseImageURL = guestDownloadURL
-		ins.BaseImageName = guestImageFriendlyName
-	} else {
-		url, err := url.Parse(ins.BaseImageURL)
-		if err != nil {
-			return fmt.Errorf("Unable to parse url %s : %v",
-				ins.BaseImageURL, err)
-		}
-		if ins.BaseImageName == "" {
-			lastSlash := strings.LastIndex(url.Path, "/")
-			if lastSlash == -1 {
-				ins.BaseImageName = url.Path
-			} else {
-				ins.BaseImageName = url.Path[lastSlash+1:]
-			}
+	url, err := url.Parse(ins.BaseImageURL)
+	if err != nil {
+		return fmt.Errorf("Unable to parse url %s : %v",
+			ins.BaseImageURL, err)
+	}
+	if ins.BaseImageName == "" {
+		lastSlash := strings.LastIndex(url.Path, "/")
+		if lastSlash == -1 {
+			ins.BaseImageName = url.Path
+		} else {
+			ins.BaseImageName = url.Path[lastSlash+1:]
 		}
 	}
 
-	if ins.Hostname == "" {
-		ins.Hostname = defaultHostname
-	}
 	return nil
 }
 

@@ -27,9 +27,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"text/template"
 	"time"
 
+	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -43,8 +46,10 @@ func init() {
 }
 
 type workload struct {
-	spec     workloadSpec
-	userData string
+	spec           workloadSpec
+	userData       string
+	parent         *workload
+	mergedUserData []byte
 }
 
 func (wkld *workload) save(ws *workspace) error {
@@ -59,7 +64,7 @@ func (wkld *workload) save(ws *workspace) error {
 	_, _ = buf.WriteString("...\n")
 
 	_, _ = buf.WriteString("---\n")
-	_, _ = buf.WriteString(wkld.userData)
+	_, _ = buf.Write(wkld.mergedUserData)
 	_, _ = buf.WriteString("...\n")
 
 	err = ioutil.WriteFile(path.Join(ws.instanceDir, "state.yaml"),
@@ -69,6 +74,23 @@ func (wkld *workload) save(ws *workspace) error {
 	}
 
 	return nil
+}
+
+func (spec *workloadSpec) ensureSSHPortMapping() {
+	var i int
+	for i = 0; i < len(spec.VM.PortMappings); i++ {
+		if spec.VM.PortMappings[i].Guest == 22 {
+			break
+		}
+	}
+
+	if i == len(spec.VM.PortMappings) {
+		spec.VM.PortMappings = append(spec.VM.PortMappings,
+			types.PortMapping{
+				Host:  10022,
+				Guest: 22,
+			})
+	}
 }
 
 func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
@@ -148,6 +170,133 @@ func unmarshalWorkload(ws *workspace, wkld *workload, spec,
 	return nil
 }
 
+func (wkld *workload) merge(parent *workload) {
+	if wkld.spec.BaseImageURL == "" {
+		wkld.spec.BaseImageURL = parent.spec.BaseImageURL
+	}
+
+	if wkld.spec.BaseImageName == "" {
+		wkld.spec.BaseImageName = parent.spec.BaseImageName
+	}
+
+	if wkld.spec.Hostname == "" {
+		wkld.spec.Hostname = parent.spec.Hostname
+	}
+
+	// Always better to require nested VM that not.
+	if !wkld.spec.NeedsNestedVM {
+		wkld.spec.NeedsNestedVM = parent.spec.NeedsNestedVM
+	}
+
+	wkld.spec.VM.Merge(&parent.spec.VM)
+}
+
+type cloudConfig map[string]interface{}
+
+func (cc cloudConfig) merge(p cloudConfig) error {
+	for k, v := range p {
+		// copy from parents to child if not present
+		if _, ok := cc[k]; !ok {
+			cc[k] = v
+			continue
+		}
+
+		// else merge slices and maps
+		switch reflect.ValueOf(v).Type().Kind() {
+		case reflect.Slice:
+			if reflect.ValueOf(cc[k]).Type() != reflect.ValueOf(v).Type() {
+				return fmt.Errorf("Types of merged sequences not equal for: %s", k)
+			}
+
+			// create new slice appending current slice (cc[k]) onto the parent slice (v)
+			s := reflect.AppendSlice(reflect.ValueOf(v), reflect.ValueOf(cc[k]))
+
+			// update the top-level map (cc) for the current key (k) with the temporary slice (s)
+			reflect.ValueOf(cc).SetMapIndex(reflect.ValueOf(k), s)
+		case reflect.Map:
+			// first level merging only
+			if reflect.ValueOf(cc[k]).Type() != reflect.ValueOf(v).Type() {
+				return fmt.Errorf("Types of merged maps not equal for: %s", k)
+			}
+
+			// for each key (kk) in the parent map (v)...
+			for _, kk := range reflect.ValueOf(v).MapKeys() {
+				// ... check if the key (kk) is present in the current map (cc[k])
+				if !reflect.ValueOf(cc[k]).MapIndex(kk).IsValid() {
+					// ... and if not copy into the current map (cc[k])
+					reflect.ValueOf(cc[k]).SetMapIndex(kk, reflect.ValueOf(v).MapIndex(kk))
+				}
+			}
+		}
+
+		// and for everything else just use version in cc
+	}
+	return nil
+}
+
+func (wkld *workload) parse(ws *workspace) (cloudConfig, error) {
+	var p cloudConfig
+	var err error
+	if wkld.parent != nil {
+		p, err = wkld.parent.parse(ws)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	funcMap := template.FuncMap{
+		"proxyVars":    proxyVarsFN,
+		"proxyEnv":     proxyEnvFN,
+		"download":     downloadFN,
+		"beginTask":    beginTaskFN,
+		"endTaskCheck": endTaskCheckFN,
+		"endTaskOk":    endTaskOkFN,
+		"endTaskFail":  endTaskFailFN,
+		"finished":     finishedFN,
+	}
+
+	udt, err := template.New("user-data").Funcs(funcMap).Parse(wkld.userData)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to parse user data template")
+	}
+
+	var udBuf bytes.Buffer
+	err = udt.Execute(&udBuf, ws)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to execute user data template")
+	}
+
+	cc := make(cloudConfig)
+	err = yaml.Unmarshal(udBuf.Bytes(), cc)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to unmarshal userdata")
+	}
+
+	if p != nil {
+		err = cc.merge(p)
+		if err != nil {
+			return nil, errors.Wrap(err, "Error merging cloud-config data")
+		}
+	}
+
+	return cc, err
+}
+
+func (wkld *workload) generateCloudConfig(ws *workspace) error {
+	data, err := wkld.parse(ws)
+	if err != nil {
+		return errors.Wrap(err, "Error parsing workload")
+	}
+
+	output, err := yaml.Marshal(data)
+	if err != nil {
+		return errors.Wrap(err, "Error marshalling cloud-config")
+	}
+
+	wkld.mergedUserData = append([]byte("#cloud-config\n"), output...)
+	return nil
+}
+
 func createWorkload(ctx context.Context, ws *workspace, workloadName string) (*workload, error) {
 	data, err := loadWorkloadData(ctx, ws, workloadName)
 	if err != nil {
@@ -171,6 +320,19 @@ func createWorkload(ctx context.Context, ws *workspace, workloadName string) (*w
 	if wkld.spec.WorkloadName == "" {
 		wkld.spec.WorkloadName = workloadName
 	}
+
+	if wkld.spec.Inherits != "" {
+		wkld.parent, err = createWorkload(ctx, ws, wkld.spec.Inherits)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Error loading inherited workload: %s", wkld.spec.Inherits)
+		}
+		wkld.merge(wkld.parent)
+	} else {
+		wkld.merge(defaultWorkload())
+	}
+
+	wkld.spec.ensureSSHPortMapping()
+
 	return &wkld, nil
 }
 
