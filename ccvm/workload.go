@@ -136,14 +136,9 @@ func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string) (
 	return wkld, nil
 }
 
-func unmarshalWorkload(ws *workspace, wkld *workload, spec, VMData,
+func unmarshalWorkload(ws *workspace, wkld *workload, spec,
 	userData string) error {
 	err := wkld.spec.unmarshalWithTemplate(ws, spec)
-	if err != nil {
-		return err
-	}
-
-	err = unmarshalWithTemplate(&wkld.spec.VM, ws, VMData)
 	if err != nil {
 		return err
 	}
@@ -160,22 +155,16 @@ func createWorkload(ctx context.Context, ws *workspace, workloadName string) (*w
 	}
 
 	var wkld workload
-	var spec, VMData, userData string
+	var spec, userData string
 	docs := splitYaml(data)
-	if len(docs) == 1 {
-		userData = string(docs[0])
-	} else if len(docs) == 2 {
+	if len(docs) == 2 {
 		spec = string(docs[0])
 		userData = string(docs[1])
-	} else if len(docs) >= 3 {
-		spec = string(docs[0])
-		VMData = string(docs[1])
-		userData = string(docs[2])
 	} else {
-		return nil, fmt.Errorf("Invalid workload")
+		return nil, errors.New("Invalid workload; two documents required")
 	}
 
-	err = unmarshalWorkload(ws, &wkld, spec, VMData, userData)
+	err = unmarshalWorkload(ws, &wkld, spec, userData)
 	if err != nil {
 		return nil, err
 	}
@@ -193,24 +182,12 @@ func restoreWorkload(ws *workspace) (*workload, error) {
 	}
 
 	docs := splitYaml(data)
-	if len(docs) == 0 {
-		return nil, fmt.Errorf("Invalid workload")
-	}
-	if len(docs) == 1 {
-		// Older versions of ccloudvm just stored the VM data and not the
-		// entire workload.
-		if err = unmarshalWithTemplate(&wkld.spec.VM, ws, string(docs[0])); err != nil {
-			return nil, err
-		}
-		return &wkld, nil
-	}
-	if len(docs) == 2 {
-		err = unmarshalWorkload(ws, &wkld, string(docs[0]), "", string(docs[1]))
-		return &wkld, err
+	if len(docs) != 2 {
+		return nil, errors.New("Invalid workload; must have two documents")
+
 	}
 
-	// 3 or more documents.
-	err = unmarshalWorkload(ws, &wkld, string(docs[0]), string(docs[1]), string(docs[2]))
+	err = unmarshalWorkload(ws, &wkld, string(docs[0]), string(docs[1]))
 	return &wkld, err
 }
 
