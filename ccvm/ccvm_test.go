@@ -14,17 +14,22 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"io/ioutil"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/intel/ccloudvm/types"
+	"github.com/pkg/errors"
 )
 
 const standardTimeout = time.Second * 300
@@ -48,6 +53,75 @@ func setupDownloadDir(t *testing.T) (string, string) {
 	}
 
 	return tmpDir, downDir
+}
+
+func waitForSSH(ctx context.Context, sshPort int) error {
+	for {
+		dialer := net.Dialer{}
+		conn, err := dialer.DialContext(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", sshPort))
+		if err == nil {
+			_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
+			scanner := bufio.NewScanner(conn)
+			retval := scanner.Scan()
+			_ = conn.Close()
+			if retval {
+				return nil
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func getProxy(upper, lower string) (string, error) {
+	proxy := os.Getenv(upper)
+	if proxy == "" {
+		proxy = os.Getenv(lower)
+	}
+
+	if proxy == "" {
+		return "", nil
+	}
+
+	if proxy[len(proxy)-1] == '/' {
+		proxy = proxy[:len(proxy)-1]
+	}
+
+	proxyURL, err := url.Parse(proxy)
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed to parse %s", proxy)
+	}
+	return proxyURL.String(), nil
+}
+
+func setProxies(args *types.CreateArgs) error {
+	HTTPProxy, err := getProxy("HTTP_PROXY", "http_proxy")
+	if err != nil {
+		return err
+	}
+
+	HTTPSProxy, err := getProxy("HTTPS_PROXY", "https_proxy")
+	if err != nil {
+		return err
+	}
+
+	if HTTPSProxy != "" {
+		u, _ := url.Parse(HTTPSProxy)
+		u.Scheme = "http"
+		HTTPSProxy = u.String()
+	}
+
+	noProxy := os.Getenv("no_proxy")
+
+	args.HTTPProxy = HTTPProxy
+	args.HTTPSProxy = HTTPSProxy
+	args.NoProxy = noProxy
+
+	return nil
 }
 
 func TestSystem(t *testing.T) {
@@ -78,9 +152,33 @@ func TestSystem(t *testing.T) {
 				Path:          tmpDir,
 			},
 		},
+		PortMappings: []types.PortMapping{
+			{
+				Host:  10022,
+				Guest: 22,
+			},
+		},
 	}
 
-	err := Create(ctx, "semaphore", false, false, vmSpec)
+	createArgs := &types.CreateArgs{
+		WorkloadName: "semaphore",
+		CustomSpec:   *vmSpec,
+		Debug:        true,
+	}
+	err := setProxies(createArgs)
+	if err != nil {
+		t.Fatalf("Unable to set proxies: %v", err)
+	}
+
+	resultCh := make(chan interface{})
+	go func() {
+		for r := range resultCh {
+			fmt.Print(r)
+		}
+	}()
+
+	err = Create(ctx, resultCh, createArgs)
+	close(resultCh)
 	if err != nil {
 		t.Fatalf("Unable to create VM: %v", err)
 	}
@@ -100,9 +198,14 @@ func TestSystem(t *testing.T) {
 		t.Errorf("Failed to Restart instance: %v", err)
 	}
 
-	_, _, err = WaitForSSH(ctx)
+	port, err := vmSpec.SSHPort()
 	if err != nil {
-		t.Errorf("Instance not available via SSH: %v", err)
+		t.Errorf("Unable to determine SSH port of instance: %v", err)
+	}
+
+	err = waitForSSH(ctx, port)
+	if err != nil {
+		t.Errorf("Instance is not available via SSH: %v", err)
 	}
 
 	err = Quit(ctx)

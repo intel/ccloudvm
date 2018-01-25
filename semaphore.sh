@@ -58,8 +58,16 @@ echo ""
 
 go version
 go get github.com/intel/ccloudvm
+go get github.com/intel/ccloudvm/ccvm
 
 export PATH=$GOPATH/bin:$PATH
+
+if [[ ! -z "${SEMAPHORE_REPO_SLUG}" ]]
+then
+    ccvm --systemd=false &
+else
+    ccloudvm setup
+fi
 
 # Create and boot a semaphore instance
 
@@ -67,7 +75,37 @@ echo ""
 echo "===== Creating instance ====="
 echo ""
 
-ccloudvm create --debug --port "8000-80" --package-upgrade=false semaphore
+if [[ ! -z "${SEMAPHORE_REPO_SLUG}" ]]
+then
+    # There's a race condition here when running on semaphore as we don't
+    # when when the ccvm server is up and running.  As we can't fork in Go we
+    # can't easily create a proper daemon.  It's doable but lots of work
+    # and as this is only a test feature we'll just retry a few times.
+	retry=0
+
+	set +e
+	until [ $retry -ge 10 ]
+	do
+	    ccloudvm create --debug --port "8000-80" --package-upgrade=false semaphore
+	    if [ $? -eq 0 ]
+	    then
+		set -e
+		break
+	    fi
+
+	    echo "Retrying create instance"
+
+	    let retry=retry+1
+
+	    if [ $retry -eq 9 ]
+	    then
+		set -e
+	     fi
+	    sleep 1
+	done
+else
+    ccloudvm create --debug --port "8000-80" --package-upgrade=false semaphore
+fi
 
 created=1
 

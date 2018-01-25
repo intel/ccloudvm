@@ -14,32 +14,35 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
 
-func prepareCreate(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) (*workload, *workspace, error) {
+func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *workspace, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	wkld, err := createWorkload(ctx, ws, workloadName)
+	ws.HTTPProxy = args.HTTPProxy
+	ws.HTTPSProxy = args.HTTPSProxy
+	ws.NoProxy = args.NoProxy
+
+	wkld, err := createWorkload(ctx, ws, args.WorkloadName)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	in := &wkld.spec.VM
 
-	err = in.MergeCustom(customSpec)
+	err = in.MergeCustom(&args.CustomSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,7 +56,7 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 	}
 
 	ws.PackageUpgrade = "false"
-	if update {
+	if args.Update {
 		ws.PackageUpgrade = "true"
 	}
 
@@ -65,10 +68,10 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 }
 
 // Create sets up the VM
-func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) error {
+func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) error {
 	var err error
 
-	wkld, ws, err := prepareCreate(ctx, workloadName, debug, update, customSpec)
+	wkld, ws, err := prepareCreate(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -104,13 +107,13 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return errors.Wrap(err, "Unable to save instance state")
 	}
 
-	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
+	resultCh <- fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName)
 	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ccvmDir, downloadProgress)
 	if err != nil {
 		return err
 	}
 
-	err = buildISOImage(ctx, ws.instanceDir, wkld.mergedUserData, ws, debug)
+	err = buildISOImage(ctx, ws.instanceDir, wkld.mergedUserData, ws, args.Debug)
 	if err != nil {
 		return err
 	}
@@ -121,20 +124,20 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
-	fmt.Printf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs)
+	resultCh <- fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs)
 
 	err = bootVM(ctx, ws, &spec)
 	if err != nil {
 		return err
 	}
 
-	err = manageInstallation(ctx, ws.ccvmDir, ws.instanceDir, ws)
+	err = manageInstallation(ctx, resultCh, ws.ccvmDir, ws.instanceDir, ws)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("VM successfully created!")
-	fmt.Println("Type ccloudvm connect to start using it.")
+	resultCh <- fmt.Sprintf("VM successfully created!\n")
+	resultCh <- fmt.Sprintf("Type ccloudvm connect to start using it.\n")
 
 	return nil
 }
@@ -220,66 +223,31 @@ func Quit(ctx context.Context) error {
 }
 
 // Status prints out VM information
-func Status(ctx context.Context) error {
+func Status(ctx context.Context) (*types.InstanceDetails, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		return errors.Wrap(err, "Unable to load instance state")
+		return nil, errors.Wrap(err, "Unable to load instance state")
 	}
 	in := &wkld.spec.VM
 
 	sshPort, err := in.SSHPort()
 	if err != nil {
-		return fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
+		return nil, fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
 	}
 
-	statusVM(ctx, ws.instanceDir, ws.keyPath, wkld.spec.WorkloadName,
-		sshPort, in.Qemuport)
-	return nil
-}
-
-// WaitForSSH blocks until an instance is ready to receive SSH connections
-func WaitForSSH(ctx context.Context) (string, int, error) {
-	ws, err := prepareEnv(ctx)
-	if err != nil {
-		return "", 0, err
-	}
-
-	wkld, err := restoreWorkload(ws)
-	if err != nil {
-		return "", 0, errors.Wrap(err, "Unable to load instance state")
-	}
-	in := &wkld.spec.VM
-
-	sshPort, err := in.SSHPort()
-	if err != nil {
-		return "", 0, err
-	}
-
-	if !sshReady(ctx, sshPort) {
-		fmt.Printf("Waiting for VM to boot ")
-	DONE:
-		for {
-			select {
-			case <-time.After(time.Second):
-			case <-ctx.Done():
-				return "", 0, fmt.Errorf("Cancelled")
-			}
-
-			if sshReady(ctx, sshPort) {
-				break DONE
-			}
-
-			fmt.Print(".")
-		}
-		fmt.Println()
-	}
-
-	return ws.keyPath, sshPort, nil
+	return &types.InstanceDetails{
+		SSH: types.SSHDetails{
+			KeyPath: ws.keyPath,
+			Port:    sshPort,
+		},
+		Workload:  wkld.spec.WorkloadName,
+		DebugPort: in.Qemuport,
+	}, nil
 }
 
 // Delete the VM

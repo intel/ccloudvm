@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"bytes"
@@ -118,27 +118,6 @@ func prepareSSHKeys(ctx context.Context, ws *workspace) error {
 	return nil
 }
 
-func getProxy(upper, lower string) (string, error) {
-	proxy := os.Getenv(upper)
-	if proxy == "" {
-		proxy = os.Getenv(lower)
-	}
-
-	if proxy == "" {
-		return "", nil
-	}
-
-	if proxy[len(proxy)-1] == '/' {
-		proxy = proxy[:len(proxy)-1]
-	}
-
-	proxyURL, err := url.Parse(proxy)
-	if err != nil {
-		return "", errors.Wrapf(err, "Failed to parse %s", proxy)
-	}
-	return proxyURL.String(), nil
-}
-
 func prepareEnv(ctx context.Context) (*workspace, error) {
 	var err error
 
@@ -159,23 +138,6 @@ func prepareEnv(ctx context.Context) (*workspace, error) {
 	ws.UID = os.Getuid()
 	ws.GID = os.Getgid()
 
-	ws.HTTPProxy, err = getProxy("HTTP_PROXY", "http_proxy")
-	if err != nil {
-		return nil, err
-	}
-
-	ws.HTTPSProxy, err = getProxy("HTTPS_PROXY", "https_proxy")
-	if err != nil {
-		return nil, err
-	}
-
-	if ws.HTTPSProxy != "" {
-		u, _ := url.Parse(ws.HTTPSProxy)
-		u.Scheme = "http"
-		ws.HTTPSProxy = u.String()
-	}
-
-	ws.NoProxy = os.Getenv("no_proxy")
 	ws.ccvmDir = path.Join(ws.Home, ".ccloudvm")
 	ws.instanceDir = path.Join(ws.ccvmDir, "instance")
 	ws.keyPath = path.Join(ws.ccvmDir, "id_rsa")

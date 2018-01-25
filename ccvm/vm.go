@@ -14,10 +14,9 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -27,7 +26,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/intel/ccloudvm/types"
@@ -149,39 +147,6 @@ func quitVM(ctx context.Context, instanceDir string) error {
 	})
 }
 
-func sshReady(ctx context.Context, sshPort int) bool {
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "tcp",
-		fmt.Sprintf("127.0.0.1:%d", sshPort))
-	if err != nil {
-		return false
-	}
-	_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
-	scanner := bufio.NewScanner(conn)
-	retval := scanner.Scan()
-	_ = conn.Close()
-	return retval
-}
-
-func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, sshPort int, qemuport uint) {
-	status := "VM down"
-	ssh := "N/A"
-	if sshReady(ctx, sshPort) {
-		status = "VM up"
-		ssh = fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", keyPath, sshPort)
-	}
-
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-	fmt.Fprintf(w, "Workload\t:\t%s\n", workloadName)
-	fmt.Fprintf(w, "Status\t:\t%s\n", status)
-	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
-	if qemuport != 0 {
-		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", qemuport)
-	}
-	_ = w.Flush()
-}
-
 func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
 	r *http.Request) {
 	params := r.URL.Query()
@@ -209,8 +174,8 @@ func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
 	}
 }
 
-func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
-	errCh chan error) {
+func startHTTPServer(ctx context.Context, resultCh chan interface{}, ccvmDir string,
+	listener net.Listener, errCh chan error) {
 	finished := false
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -227,9 +192,9 @@ func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 			return
 		}
 		if line == "OK" || line == "FAIL" {
-			fmt.Printf("[%s]\n", line)
+			resultCh <- fmt.Sprintf("[%s]\n", line)
 		} else {
-			fmt.Printf("%s : ", line)
+			resultCh <- fmt.Sprintf("%s : ", line)
 		}
 	})
 
@@ -250,7 +215,8 @@ func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 	}()
 }
 
-func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *workspace) error {
+func manageInstallation(ctx context.Context, resultCh chan interface{}, ccvmDir, instanceDir string,
+	ws *workspace) error {
 	socket := path.Join(instanceDir, "socket")
 	disconnectedCh := make(chan struct{})
 
@@ -281,7 +247,7 @@ func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *wo
 	}
 
 	errCh := make(chan error)
-	startHTTPServer(ctx, ccvmDir, listener, errCh)
+	startHTTPServer(ctx, resultCh, ccvmDir, listener, errCh)
 	select {
 	case <-ctx.Done():
 		_ = listener.Close()
