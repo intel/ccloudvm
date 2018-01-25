@@ -199,6 +199,8 @@ inherits: level0
 seq:
 - command 1
 - command 2
+runcmd:
+- command 1
 map:
  key1: value1
 `
@@ -214,6 +216,8 @@ seq:
 map:
   key2: value2
 extra: value
+runcmd:
+- command 2
 `
 
 func level0spec() workloadSpec {
@@ -259,12 +263,17 @@ func level2spec() workloadSpec {
 
 var level0cloudConfig = `#cloud-config
 base: value
+runcmd:
+- curl -X PUT -d "FINISHED" 10.0.2.2:0
 `
 
 var level1cloudConfig = `#cloud-config
 base: value
 map:
   key1: value1
+runcmd:
+- command 1
+- curl -X PUT -d "FINISHED" 10.0.2.2:0
 seq:
 - command 1
 - command 2
@@ -276,6 +285,10 @@ extra: value
 map:
   key1: value1
   key2: value2
+runcmd:
+- command 1
+- command 2
+- curl -X PUT -d "FINISHED" 10.0.2.2:0
 seq:
 - command 1
 - command 2
@@ -349,7 +362,10 @@ func TestWorkloadInheritance(t *testing.T) {
 		}
 
 		if string(wkld.mergedUserData) != workloads[i].cloudConfig {
-			t.Fatalf("Merged data doesn't match expected: %s vs %s", string(wkld.mergedUserData), workloads[i].cloudConfig)
+			t.Fatalf("Merged data doesn't match expected for %s: %s vs %s",
+				workloads[i].name,
+				string(wkld.mergedUserData),
+				workloads[i].cloudConfig)
 		}
 	}
 }

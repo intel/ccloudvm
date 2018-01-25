@@ -252,7 +252,6 @@ func (wkld *workload) parse(ws *workspace) (cloudConfig, error) {
 		"endTaskCheck": endTaskCheckFN,
 		"endTaskOk":    endTaskOkFN,
 		"endTaskFail":  endTaskFailFN,
-		"finished":     finishedFN,
 	}
 
 	udt, err := template.New("user-data").Funcs(funcMap).Parse(wkld.userData)
@@ -288,12 +287,23 @@ func (wkld *workload) generateCloudConfig(ws *workspace) error {
 		return errors.Wrap(err, "Error parsing workload")
 	}
 
+	finishedStr := fmt.Sprintf(`curl -X PUT -d "FINISHED" 10.0.2.2:%d`,
+		ws.HTTPServerPort)
+	if v, ok := data["runcmd"]; ok {
+		runcmds := v.([]interface{})
+		runcmds = append(runcmds, finishedStr)
+		data["runcmd"] = runcmds
+	} else {
+		data["runcmd"] = []string{finishedStr}
+	}
+
 	output, err := yaml.Marshal(data)
 	if err != nil {
 		return errors.Wrap(err, "Error marshalling cloud-config")
 	}
 
 	wkld.mergedUserData = append([]byte("#cloud-config\n"), output...)
+
 	return nil
 }
 

@@ -121,8 +121,6 @@ cpus: 2
 ---
 #cloud-config
 package_upgrade: false
-runcmd:
- - {{finished .}}
 
 users:
   - name: {{.User}}
@@ -338,14 +336,6 @@ if it fails.
 Reporting a failure back to ccloudvm does not cause the create command to exit.  The
 failure is presented to the user and the setup of the VM continues.
 
-#### Finished
-
-Every cloudinit document must contain a runcmd: section and that section must contain
-a call to the finished function.  The function takes one parameter, the workspace
-parameter.  A call to
-
-```
- - {{finished .}}
 ```
 
 is usually the last command in the runcmd section.  Remember it's currently mandatory.

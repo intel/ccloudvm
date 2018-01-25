@@ -261,11 +261,6 @@ func endTaskFailFN(ws *workspace) string {
 	return fmt.Sprintf(failStr, ws.HTTPServerPort)
 }
 
-func finishedFN(ws *workspace) string {
-	const finishedStr = `curl -X PUT -d "FINISHED" 10.0.2.2:%d`
-	return fmt.Sprintf(finishedStr, ws.HTTPServerPort)
-}
-
 func proxyVarsFN(ws *workspace) string {
 	var buf bytes.Buffer
 	if ws.NoProxy != "" {
