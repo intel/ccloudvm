@@ -297,6 +297,13 @@ func (wkld *workload) generateCloudConfig(ws *workspace) error {
 		data["runcmd"] = []string{finishedStr}
 	}
 
+	// remove empty top levels from the earlier parse
+	for k, v := range data {
+		if v == nil {
+			delete(data, k)
+		}
+	}
+
 	output, err := yaml.Marshal(data)
 	if err != nil {
 		return errors.Wrap(err, "Error marshalling cloud-config")
