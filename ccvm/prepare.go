@@ -129,10 +129,10 @@ func prepareSSHKeys(ctx context.Context, ws *workspace) error {
 	_, pubKeyErr := os.Stat(ws.publicKeyPath)
 
 	if pubKeyErr != nil || privKeyErr != nil {
-		err := exec.CommandContext(ctx, "ssh-keygen",
-			"-f", ws.keyPath, "-t", "rsa", "-N", "").Run()
+		out, err := exec.CommandContext(ctx, "ssh-keygen",
+			"-f", ws.keyPath, "-t", "rsa", "-N", "").CombinedOutput()
 		if err != nil {
-			return errors.Wrap(err, "Unable to generate SSH key pair")
+			return errors.Wrapf(err, "Unable to generate SSH key pair: %s", string(out))
 		}
 	}
 
