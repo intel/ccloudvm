@@ -64,11 +64,6 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 		return nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
-	err = wkld.generateCloudConfig(ws)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "Error applying template to user-data")
-	}
-
 	return wkld, ws, nil
 }
 
@@ -100,14 +95,19 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		}
 	}()
 
-	err = wkld.save(ws)
-	if err != nil {
-		return errors.Wrap(err, "Unable to save instance state")
-	}
-
 	err = prepareSSHKeys(ctx, ws)
 	if err != nil {
 		return err
+	}
+
+	err = wkld.generateCloudConfig(ws)
+	if err != nil {
+		return errors.Wrap(err, "Error applying template to user-data")
+	}
+
+	err = wkld.save(ws)
+	if err != nil {
+		return errors.Wrap(err, "Unable to save instance state")
 	}
 
 	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
