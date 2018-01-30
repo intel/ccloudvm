@@ -1,6 +1,5 @@
 ---
-base_image_url: https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
-base_image_name: Ubuntu 16.04
+inherits: xenial
 needs_nested_vm: true
 vm:
 {{with .GoPath}}
@@ -18,17 +17,6 @@ vm:
 {{ define "GOPATH" }}{{with .GoPath}}{{$.MountPath "hostgo"}}{{else}}/home/{{.User}}/go{{end}}{{end}}
 #cloud-config
 write_files:
-{{- if len $.HTTPProxy }}
- - content: |
-     [Service]
-     Environment="HTTP_PROXY={{$.HTTPProxy}}"{{if len .HTTPSProxy}} "HTTPS_PROXY={{.HTTPSProxy}}{{end}}"{{if len .NoProxy}} "NO_PROXY={{.NoProxy}},{{.Hostname}}{{end}}"
-   path: /etc/systemd/system/docker.service.d/http-proxy.conf
-{{- end}}
-{{with proxyEnv . 5}}
- - content: |
-{{.}}
-   path: /etc/environment
-{{end}}
  - content: |
      #!/bin/sh
      printf "\n"
@@ -46,34 +34,7 @@ write_files:
      deb http://apt.kubernetes.io/ kubernetes-xenial main
    path: /etc/apt/sources.list.d/kubernetes.list
 
-apt:
-{{- if len $.HTTPProxy }}
-  proxy: "{{$.HTTPProxy}}"
-{{- end}}
-{{- if len $.HTTPSProxy }}
-  https_proxy: "{{$.HTTPSProxy}}"
-{{- end}}
-package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}true{{end}}
-
 runcmd:
- - {{beginTask . "Booting VM"}}
- - {{endTaskOk . }}
-
- - {{beginTask . (printf "Adding %s to /etc/hosts" .Hostname) }}
- - echo "127.0.0.1 {{.Hostname}}" >> /etc/hosts
- - {{endTaskCheck .}}
-
-{{range .Mounts}}
- - mkdir -p {{.Path}}
- - sudo chown {{$.User}}:{{$.User}} {{.Tag}}
- - echo "{{.Tag}} {{.Path}} 9p x-systemd.automount,x-systemd.device-timeout=10,nofail,trans=virtio,version=9p2000.L 0 0" >> /etc/fstab
-{{end}}
-{{range .Mounts}}
- - {{beginTask $ (printf "Mounting %s" .Path) }}
- - mount {{.Path}}
- - {{endTaskCheck $}}
-{{end}}
-
  - chown {{.User}}:{{.User}} /home/{{.User}}
 {{- with .MountPath "hostui"}}
  - chown {{$.User}}:{{$.User}} {{.}}
@@ -193,15 +154,4 @@ runcmd:
 
  - echo "export GOPATH={{template "GOPATH" . }}" >> /home/{{.User}}/.profile
  - echo "export PATH=$PATH:{{template "GOPATH" . }}/bin:/usr/local/go/bin" >> /home/{{.User}}/.profile
-
-users:
-  - name: {{.User}}
-    uid: "{{.UID}}"
-    gid: "{{.GID}}"
-    gecos: CIAO Demo User
-    lock-passwd: true
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh-authorized-keys:
-    - {{.PublicKey}}
 ...
