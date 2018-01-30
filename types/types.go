@@ -191,3 +191,24 @@ func (in *VMSpec) SSHPort() (int, error) {
 	}
 	return 0, fmt.Errorf("No SSH port configured")
 }
+
+// Merge from a parent spec into the current spec
+func (in *VMSpec) Merge(parent *VMSpec) {
+	if in.MemMiB == 0 {
+		in.MemMiB = parent.MemMiB
+	}
+
+	if in.CPUs == 0 {
+		in.CPUs = parent.CPUs
+	}
+	if in.DiskGiB == 0 {
+		in.DiskGiB = parent.DiskGiB
+	}
+	if in.Qemuport == 0 {
+		in.Qemuport = parent.Qemuport
+	}
+
+	in.MergeMounts(parent.Mounts)
+	in.MergePorts(parent.PortMappings)
+	in.MergeDrives(parent.Drives)
+}

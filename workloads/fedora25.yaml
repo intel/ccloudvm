@@ -51,8 +51,6 @@ runcmd:
  - {{endTaskCheck $}}
 {{end}}
 
- - {{finished .}}
-
 users:
   - name: {{.User}}
     gecos: CC Demo User

@@ -95,14 +95,19 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		}
 	}()
 
-	err = wkld.save(ws)
-	if err != nil {
-		return errors.Wrap(err, "Unable to save instance state")
-	}
-
 	err = prepareSSHKeys(ctx, ws)
 	if err != nil {
 		return err
+	}
+
+	err = wkld.generateCloudConfig(ws)
+	if err != nil {
+		return errors.Wrap(err, "Error applying template to user-data")
+	}
+
+	err = wkld.save(ws)
+	if err != nil {
+		return errors.Wrap(err, "Unable to save instance state")
 	}
 
 	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
@@ -111,7 +116,7 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
-	err = buildISOImage(ctx, ws.instanceDir, wkld.userData, ws, debug)
+	err = buildISOImage(ctx, ws.instanceDir, wkld.mergedUserData, ws, debug)
 	if err != nil {
 		return err
 	}

@@ -36,6 +36,8 @@ vm:
   - host: 10022
     guest: 22
   mounts: []
+  disk_gib: 60
+hostname: singlevm
 `
 
 var mockVMSpec = types.VMSpec{

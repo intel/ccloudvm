@@ -186,8 +186,6 @@ runcmd:
  - {{endTaskCheck .}}
 {{end}}
 
- - {{finished .}}
-
 users:
   - name: {{.User}}
     uid: "{{.UID}}"
