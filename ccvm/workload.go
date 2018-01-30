@@ -201,6 +201,12 @@ func (cc cloudConfig) merge(p cloudConfig) error {
 			continue
 		}
 
+		// If we can't merge (because value is nil) copy parent.
+		if !reflect.ValueOf(cc[k]).IsValid() {
+			cc[k] = v
+			continue
+		}
+
 		// else merge slices and maps
 		switch reflect.ValueOf(v).Type().Kind() {
 		case reflect.Slice:
@@ -214,6 +220,7 @@ func (cc cloudConfig) merge(p cloudConfig) error {
 			// update the top-level map (cc) for the current key (k) with the temporary slice (s)
 			reflect.ValueOf(cc).SetMapIndex(reflect.ValueOf(k), s)
 		case reflect.Map:
+
 			// first level merging only
 			if reflect.ValueOf(cc[k]).Type() != reflect.ValueOf(v).Type() {
 				return fmt.Errorf("Types of merged maps not equal for: %s", k)
