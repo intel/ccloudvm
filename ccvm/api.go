@@ -81,6 +81,7 @@ func (s *ServerAPI) voidResult(id int, reply *struct{}) error {
 // Cancel can be used to cancel any command that has been issued but not
 // yet completed.
 func (s *ServerAPI) Cancel(arg int, reply *struct{}) error {
+	fmt.Printf("Cancel(%d) called\n", arg)
 	s.actionCh <- cancelAction(arg)
 	*reply = struct{}{}
 	return nil
@@ -90,9 +91,13 @@ func (s *ServerAPI) Cancel(arg int, reply *struct{}) error {
 // args parameter. The value pointed to by id is set to the transaction ID of the request
 // if no error occurs.
 func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
+	fmt.Printf("Create %+v called\n", *args)
+
 	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
 		resultCh <- Create(ctx, resultCh, args)
 	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
 }
 
@@ -104,6 +109,8 @@ func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
 func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 	var err error
 
+	fmt.Printf("CreateResult(%d) called\n", id)
+
 	result := getResult{
 		ID:  id,
 		res: make(chan interface{}),
@@ -112,6 +119,7 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 	s.actionCh <- result
 	r := <-result.res
 	if v, ok := r.(error); ok {
+		fmt.Printf("CreateResult(%d) finished: %v\n", id, err)
 		return v
 	}
 
@@ -132,64 +140,103 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 
 	s.actionCh <- completeAction(id)
 
+	fmt.Printf("CreateResult(%d) finished: %v\n", id, err)
+
 	return err
 }
 
 // Stop initiates a request to stop an instance.
 func (s *ServerAPI) Stop(args struct{}, id *int) error {
 	fmt.Println("Stop called")
+
 	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
 		resultCh <- Stop(ctx)
 	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
 }
 
 // StopResult blocks until the instance has been stopped or an error has occurred.
 func (s *ServerAPI) StopResult(id int, reply *struct{}) error {
-	return s.voidResult(id, reply)
+	fmt.Printf("StopResult(%d) called\n", id)
+
+	err := s.voidResult(id, reply)
+
+	fmt.Printf("StopResult(%d) finished: %v\n", id, err)
+	return err
 }
 
 // Start initiates a request to start an instance.
 func (s *ServerAPI) Start(vmSpec *types.VMSpec, id *int) error {
+	fmt.Println("Start called")
+
 	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
 		resultCh <- Start(ctx, vmSpec)
 	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
 }
 
 // StartResult blocks until the instance has been started or an error occurs.
 func (s *ServerAPI) StartResult(id int, reply *struct{}) error {
-	return s.voidResult(id, reply)
+	fmt.Printf("StartResult(%d) called\n", id)
+
+	err := s.voidResult(id, reply)
+
+	fmt.Printf("StartResult(%d) finished: %v\n", id, err)
+	return err
 }
 
 // Quit initiates a request to forcefully quit an instance.
 func (s *ServerAPI) Quit(args struct{}, id *int) error {
+	fmt.Println("Quit called")
+
 	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
 		resultCh <- Quit(ctx)
 	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
 }
 
 // QuitResult blocks until the instance has been quit or an error occurs.
 func (s *ServerAPI) QuitResult(id int, reply *struct{}) error {
-	return s.voidResult(id, reply)
+	fmt.Printf("QuitResult(%d) called\n", id)
+
+	err := s.voidResult(id, reply)
+
+	fmt.Printf("QuitResult(%d) finished: %v\n", id, err)
+	return err
 }
 
 // Delete initiates a request to delete an instance.
 func (s *ServerAPI) Delete(args struct{}, id *int) error {
+	fmt.Println("Delete called")
+
 	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
 		resultCh <- Delete(ctx)
 	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
 }
 
 // DeleteResult blocks until the instance has been deleted or an error has occurred.
 func (s *ServerAPI) DeleteResult(id int, reply *struct{}) error {
-	return s.voidResult(id, reply)
+	fmt.Printf("DeleteResult(%d) called\n", id)
+
+	err := s.voidResult(id, reply)
+
+	fmt.Printf("DeleteResult(%d) finished: %v\n", id, err)
+	return err
 }
 
 // GetInstanceDetails initiates a request to retrieve information about an instance.
 func (s *ServerAPI) GetInstanceDetails(args struct{}, id *int) error {
+	fmt.Println("GetInstanceDetails called")
+
 	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
 		details, err := Status(ctx)
 		result := getInstanceComplete{
@@ -200,12 +247,16 @@ func (s *ServerAPI) GetInstanceDetails(args struct{}, id *int) error {
 		}
 		resultCh <- result
 	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
 }
 
 // GetInstanceDetailsResult blocks until the instance's details have been received or
 // an error occurs.
 func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetails) error {
+	fmt.Printf("GetInstanceDetails(%d) called\n", id)
+
 	result := getResult{
 		ID:  id,
 		res: make(chan interface{}),
@@ -214,11 +265,15 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 	s.actionCh <- result
 	r := <-result.res
 	if v, ok := r.(error); ok {
+		fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, v)
 		return v
 	}
 	resultCh := r.(chan interface{})
 	res := (<-resultCh).(getInstanceComplete)
 	s.actionCh <- completeAction(id)
+
+	fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, res.err)
+
 	if res.err != nil {
 		return res.err
 	}

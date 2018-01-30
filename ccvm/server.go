@@ -68,7 +68,6 @@ type service struct {
 }
 
 func (s *service) processAction(action interface{}) {
-	fmt.Printf("action received %v\n", action)
 	switch a := action.(type) {
 	case startAction:
 		/*
