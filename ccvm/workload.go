@@ -201,12 +201,6 @@ func (cc cloudConfig) merge(p cloudConfig) error {
 			continue
 		}
 
-		// If we can't merge (because value is nil) copy parent.
-		if !reflect.ValueOf(cc[k]).IsValid() {
-			cc[k] = v
-			continue
-		}
-
 		// else merge slices and maps
 		switch reflect.ValueOf(v).Type().Kind() {
 		case reflect.Slice:
@@ -278,6 +272,13 @@ func (wkld *workload) parse(ws *workspace) (cloudConfig, error) {
 		return nil, errors.Wrap(err, "Unable to unmarshal userdata")
 	}
 
+	// remove empty top levels from the earlier parse
+	for k, v := range cc {
+		if v == nil {
+			delete(cc, k)
+		}
+	}
+
 	if p != nil {
 		err = cc.merge(p)
 		if err != nil {
@@ -292,13 +293,6 @@ func (wkld *workload) generateCloudConfig(ws *workspace) error {
 	data, err := wkld.parse(ws)
 	if err != nil {
 		return errors.Wrap(err, "Error parsing workload")
-	}
-
-	// remove empty top levels from the earlier parse
-	for k, v := range data {
-		if v == nil {
-			delete(data, k)
-		}
 	}
 
 	finishedStr := fmt.Sprintf(`curl -X PUT -d "FINISHED" 10.0.2.2:%d`,

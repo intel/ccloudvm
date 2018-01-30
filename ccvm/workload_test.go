@@ -220,6 +220,23 @@ runcmd:
 - command 2
 `
 
+// empty runcmd in final
+var invalidWorkload1 = `
+inherits: level0
+...
+---
+runcmd:
+`
+
+// empty runcmd in parent
+var invalidWorkload2 = `
+inherits: invalid1
+...
+---
+runcmd:
+  - test
+`
+
 func level0spec() workloadSpec {
 	spec := workloadSpec{
 		BaseImageURL:  "https://mirror.us-midwest-1.nexcess.net/fedora/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2",
@@ -261,6 +278,22 @@ func level2spec() workloadSpec {
 	return spec
 }
 
+func invalid1spec() workloadSpec {
+	spec := level0spec()
+	spec.Inherits = "level0"
+	spec.WorkloadName = "invalid1"
+
+	return spec
+}
+
+func invalid2spec() workloadSpec {
+	spec := invalid1spec()
+	spec.Inherits = "invalid1"
+	spec.WorkloadName = "invalid2"
+
+	return spec
+}
+
 var level0cloudConfig = `#cloud-config
 base: value
 runcmd:
@@ -295,6 +328,19 @@ seq:
 - command 3
 `
 
+var invalid1cloudConfig = `#cloud-config
+base: value
+runcmd:
+- curl -X PUT -d "FINISHED" 10.0.2.2:0
+`
+
+var invalid2cloudConfig = `#cloud-config
+base: value
+runcmd:
+- test
+- curl -X PUT -d "FINISHED" 10.0.2.2:0
+`
+
 func TestWorkloadInheritance(t *testing.T) {
 	workloads := []struct {
 		body        string
@@ -319,6 +365,18 @@ func TestWorkloadInheritance(t *testing.T) {
 			"level2",
 			level2spec(),
 			level2cloudConfig,
+		},
+		{
+			invalidWorkload1,
+			"invalid1",
+			invalid1spec(),
+			invalid1cloudConfig,
+		},
+		{
+			invalidWorkload2,
+			"invalid2",
+			invalid2spec(),
+			invalid2cloudConfig,
 		},
 	}
 
