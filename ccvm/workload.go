@@ -294,6 +294,13 @@ func (wkld *workload) generateCloudConfig(ws *workspace) error {
 		return errors.Wrap(err, "Error parsing workload")
 	}
 
+	// remove empty top levels from the earlier parse
+	for k, v := range data {
+		if v == nil {
+			delete(data, k)
+		}
+	}
+
 	finishedStr := fmt.Sprintf(`curl -X PUT -d "FINISHED" 10.0.2.2:%d`,
 		ws.HTTPServerPort)
 	if v, ok := data["runcmd"]; ok {
@@ -302,13 +309,6 @@ func (wkld *workload) generateCloudConfig(ws *workspace) error {
 		data["runcmd"] = runcmds
 	} else {
 		data["runcmd"] = []string{finishedStr}
-	}
-
-	// remove empty top levels from the earlier parse
-	for k, v := range data {
-		if v == nil {
-			delete(data, k)
-		}
 	}
 
 	output, err := yaml.Marshal(data)
