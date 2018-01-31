@@ -259,7 +259,7 @@ func proxyEnvFN(ws *workspace, indent int) string {
 	return buf.String()
 }
 
-func buildISOImage(ctx context.Context, instanceDir string, userData []byte, ws *workspace, debug bool) error {
+func buildISOImage(ctx context.Context, resultCh chan interface{}, userData []byte, ws *workspace, debug bool) error {
 	mdt, err := template.New("meta-data").Parse(metaDataTemplate)
 	if err != nil {
 		return errors.Wrap(err, "Unable to parse meta data template")
@@ -272,11 +272,11 @@ func buildISOImage(ctx context.Context, instanceDir string, userData []byte, ws 
 	}
 
 	if debug {
-		fmt.Println(string(userData))
-		fmt.Println(string(mdBuf.Bytes()))
+		resultCh <- string(userData)
+		resultCh <- string(mdBuf.Bytes())
 	}
 
-	return createCloudInitISO(ctx, instanceDir, userData, mdBuf.Bytes())
+	return createCloudInitISO(ctx, ws.instanceDir, userData, mdBuf.Bytes())
 }
 
 func createRootfs(ctx context.Context, backingImage, instanceDir string, disk int) error {

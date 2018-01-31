@@ -113,7 +113,7 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 		return err
 	}
 
-	err = buildISOImage(ctx, ws.instanceDir, wkld.mergedUserData, ws, args.Debug)
+	err = buildISOImage(ctx, resultCh, wkld.mergedUserData, ws, args.Debug)
 	if err != nil {
 		return err
 	}
