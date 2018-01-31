@@ -20,8 +20,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/rpc"
 	"net/url"
 	"os"
@@ -132,6 +134,39 @@ func Setup(ctx context.Context) error {
 	return nil
 }
 
+func dialHTTP(ctx context.Context, socketPath string) (client *rpc.Client, err error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	d := &net.Dialer{}
+	conn, err := d.DialContext(timeoutCtx, "unix", socketPath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if client == nil {
+			_ = conn.Close()
+		}
+	}()
+	connectString := fmt.Sprintf("CONNECT %s HTTP/1.0\n\n", rpc.DefaultRPCPath)
+	_, err = io.WriteString(conn, connectString)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{
+		Method: http.MethodConnect,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if r.Status != "200 Connected to Go RPC" {
+		return nil, errors.Errorf("Unexpected response (%s) from RPC server", r.Status)
+	}
+
+	return rpc.NewClient(conn), nil
+}
+
 func issueCommand(ctx context.Context, call func(*rpc.Client) (int, error),
 	result func(*rpc.Client, int) error) error {
 	home := os.Getenv("HOME")
@@ -140,10 +175,21 @@ func issueCommand(ctx context.Context, call func(*rpc.Client) (int, error),
 	}
 
 	socketPath := filepath.Join(home, ".ccloudvm/socket")
-	client, err := rpc.DialHTTP("unix", socketPath)
+	client, err := dialHTTP(ctx, socketPath)
 	if err != nil {
-		return errors.Wrap(err, "Unable to communicate with server")
+		err2 := exec.Command("systemctl", "--user", "restart", "ccloudvm.socket").Run()
+		if err2 != nil {
+			return errors.Wrap(err, "Unable to communicate with server. Try running 'ccloudvm setup'")
+		}
+		client, err = rpc.DialHTTP("unix", socketPath)
+		if err != nil {
+			return errors.Wrap(err, "Unable to communicate with server")
+		}
 	}
+
+	defer func() {
+		_ = client.Close()
+	}()
 
 	id, err := call(client)
 	if err != nil {
