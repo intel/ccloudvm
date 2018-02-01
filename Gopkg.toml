@@ -34,6 +34,14 @@
   version = "1.0.0"
 
 [[constraint]]
+  name = "golang.org/x/net"
+  revision = "309822c5b9b9f80db67f016069a12628d94fad34"
+
+[[constraint]]
+  name = "golang.org/x/text"
+  revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
+
+[[constraint]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
 
