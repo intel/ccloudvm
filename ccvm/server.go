@@ -35,9 +35,12 @@ import (
 )
 
 var systemd bool
+var downloadCh chan downloadRequest
 
 func init() {
 	flag.BoolVar(&systemd, "systemd", true, "Use systemd socket activation if true")
+
+	downloadCh = make(chan downloadRequest)
 }
 
 type startAction struct {
@@ -158,7 +161,21 @@ DONE:
 	fmt.Println("Shutting down Service")
 }
 
-func getListener() (net.Listener, error) {
+func makeDir() (string, error) {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return "", errors.New("HOME is not defined")
+	}
+	ccvmDir := filepath.Join(home, ".ccloudvm")
+	err := os.MkdirAll(ccvmDir, 0700)
+	if err != nil {
+		return "", errors.Wrapf(err, "Unable to create %s", ccvmDir)
+	}
+
+	return ccvmDir, nil
+}
+
+func getListener(domainParent string) (net.Listener, error) {
 	if systemd {
 		listeners, err := activation.Listeners(true)
 		if err != nil {
@@ -172,15 +189,6 @@ func getListener() (net.Listener, error) {
 		return listeners[0], nil
 	}
 
-	home := os.Getenv("HOME")
-	if home == "" {
-		return nil, errors.New("HOME is not defined")
-	}
-	domainParent := filepath.Join(home, ".ccloudvm")
-	err := os.MkdirAll(domainParent, 0700)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to create %s", domainParent)
-	}
 	listener, err := net.Listen("unix", filepath.Join(domainParent, "socket"))
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to create listener")
@@ -189,7 +197,11 @@ func getListener() (net.Listener, error) {
 }
 
 func startServer(signalCh chan os.Signal) error {
-	listener, err := getListener()
+	ccvmDir, err := makeDir()
+	if err != nil {
+		return err
+	}
+	listener, err := getListener(ccvmDir)
 	if err != nil {
 		return err
 	}
@@ -215,11 +227,25 @@ func startServer(signalCh chan os.Signal) error {
 	fmt.Println("Running server")
 
 	var wg sync.WaitGroup
+
+	d := downloader{}
+	err = d.setup(ccvmDir)
+	if err != nil {
+		return errors.Wrap(err, "Unable to start download manager")
+	}
+
+	wg.Add(1)
+	go func() {
+		d.start(doneCh, downloadCh)
+		wg.Done()
+	}()
+
 	wg.Add(1)
 	go func() {
 		_ = ccvmServer.Serve(listener)
 		wg.Done()
 	}()
+
 	wg.Add(1)
 	go func() {
 		svc := &service{}
@@ -232,6 +258,7 @@ func startServer(signalCh chan os.Signal) error {
 		fmt.Println("Signal channel closed")
 		close(doneCh)
 	case <-finishedCh:
+		close(doneCh)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	err = ccvmServer.Shutdown(ctx)

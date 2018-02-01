@@ -91,7 +91,7 @@ func TestCreateWorkload(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create mock workload : %v", err)
 	} else {
-		workload, err := createWorkload(context.Background(), ws, "workload")
+		workload, err := createWorkload(context.Background(), ws, "workload", nil)
 		if err != nil {
 			t.Errorf("Unable to create workload : %v", err)
 		} else {
@@ -105,7 +105,7 @@ func TestCreateWorkload(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create mock workload : %v", err)
 	} else {
-		workload, err := createWorkload(context.Background(), ws, "workload")
+		workload, err := createWorkload(context.Background(), ws, "workload", nil)
 		if err != nil {
 			t.Errorf("Unable to create workload : %v", err)
 		} else {
@@ -405,7 +405,7 @@ func TestWorkloadInheritance(t *testing.T) {
 	}
 
 	for i := range workloads {
-		wkld, err := createWorkload(context.TODO(), ws, workloads[i].name)
+		wkld, err := createWorkload(context.TODO(), ws, workloads[i].name, nil)
 		if err != nil {
 			t.Fatalf("Error creating workloads: %v", err)
 		}
@@ -450,7 +450,7 @@ func TestBaseWorkload(t *testing.T) {
 		t.Fatalf("Failed to create mock workload: %v", err)
 	}
 
-	wkld, err := createWorkload(context.Background(), ws, "")
+	wkld, err := createWorkload(context.Background(), ws, "", nil)
 	if err != nil {
 		t.Fatalf("Error creating workloads: %v", err)
 	}

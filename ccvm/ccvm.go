@@ -19,32 +19,35 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
 
-func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *workspace, error) {
+func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *workspace, *http.Transport, error) {
 	ws, err := prepareEnv(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	ws.HTTPProxy = args.HTTPProxy
 	ws.HTTPSProxy = args.HTTPSProxy
 	ws.NoProxy = args.NoProxy
 
-	wkld, err := createWorkload(ctx, ws, args.WorkloadName)
+	transport := getHTTPTransport(ws.HTTPProxy, ws.HTTPSProxy, ws.NoProxy)
+
+	wkld, err := createWorkload(ctx, ws, args.WorkloadName, transport)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	in := &wkld.spec.VM
 
 	err = in.MergeCustom(&args.CustomSpec)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	ws.Mounts = in.Mounts
@@ -61,17 +64,25 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		return nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
+		return nil, nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
-	return wkld, ws, nil
+	return wkld, ws, transport, nil
+}
+
+func downloadProgress(resultCh chan interface{}, p progress) {
+	if p.totalMB >= 0 {
+		resultCh <- fmt.Sprintf("Downloaded %d MB of %d\n", p.downloadedMB, p.totalMB)
+	} else {
+		resultCh <- fmt.Sprintf("Downloaded %d MB\n", p.downloadedMB)
+	}
 }
 
 // Create sets up the VM
 func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) error {
 	var err error
 
-	wkld, ws, err := prepareCreate(ctx, args)
+	wkld, ws, transport, err := prepareCreate(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -108,7 +119,11 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 	}
 
 	resultCh <- fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName)
-	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ccvmDir, downloadProgress)
+
+	qcowPath, err := downloadFile(ctx, transport, wkld.spec.BaseImageURL, ws.ccvmDir,
+		func(p progress) {
+			downloadProgress(resultCh, p)
+		})
 	if err != nil {
 		return err
 	}
@@ -131,7 +146,7 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 		return err
 	}
 
-	err = manageInstallation(ctx, resultCh, ws.ccvmDir, ws.instanceDir, ws)
+	err = manageInstallation(ctx, resultCh, transport, ws.ccvmDir, ws.instanceDir, ws)
 	if err != nil {
 		return err
 	}

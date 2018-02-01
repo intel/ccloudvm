@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,6 +125,21 @@ func setProxies(args *types.CreateArgs) error {
 	return nil
 }
 
+func createDownloader() (*downloader, error) {
+	d := &downloader{}
+	home := os.Getenv("HOME")
+	if home == "" {
+		return nil, errors.New("Unable to determine home directory")
+	}
+
+	err := d.setup(filepath.Join(home, ".ccloudvm"))
+	if err != nil {
+		return nil, err
+	}
+
+	return d, nil
+}
+
 func TestSystem(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), standardTimeout)
 	defer func() {
@@ -177,11 +193,25 @@ func TestSystem(t *testing.T) {
 		}
 	}()
 
+	d, err := createDownloader()
+	if err != nil {
+		t.Fatalf("Unable to create downloaded:  %v", err)
+	}
+	doneCh := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		d.start(doneCh, downloadCh)
+		wg.Done()
+	}()
+
 	err = Create(ctx, resultCh, createArgs)
 	close(resultCh)
 	if err != nil {
 		t.Fatalf("Unable to create VM: %v", err)
 	}
+	close(doneCh)
+	wg.Wait()
 
 	err = Start(ctx, vmSpec)
 	if err == nil || err == context.DeadlineExceeded {

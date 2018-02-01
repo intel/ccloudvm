@@ -20,32 +20,62 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/http/httpproxy"
 )
-
-type downloadInfo struct {
-	imageName    string
-	imageTmpName string
-}
 
 type progressCB func(p progress)
 
 type progress struct {
 	downloadedMB int
 	totalMB      int
+	complete     bool
+}
+
+type downloadUpdate struct {
+	p   progress
+	err error
+}
+
+type updateInfo struct {
+	downloadUpdate
+	name string
 }
 
 type progressReader struct {
 	downloaded int64
 	totalMB    int
 	reader     io.Reader
-	cb         progressCB
+	progressCh chan updateInfo
+	name       string
+}
+
+type downloadRequest struct {
+	progress  chan downloadUpdate
+	URL       string
+	ctx       context.Context
+	transport *http.Transport
+}
+
+type downloadedFile struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	p         progress
+	listeners []downloadRequest
+}
+
+type downloader struct {
+	files    map[string]*downloadedFile
+	cacheDir string
 }
 
 func (pr *progressReader) Read(p []byte) (int, error) {
@@ -55,25 +85,55 @@ func (pr *progressReader) Read(p []byte) (int, error) {
 		pr.downloaded += int64(read)
 		newMB := pr.downloaded / 10000000
 		if newMB > oldMB {
-			pr.cb(progress{downloadedMB: int(newMB * 10), totalMB: pr.totalMB})
+			pr.progressCh <- updateInfo{
+				downloadUpdate: downloadUpdate{
+					p: progress{
+						downloadedMB: int(newMB * 10),
+						totalMB:      pr.totalMB,
+					},
+				},
+				name: pr.name,
+			}
 		}
 	}
 	return read, err
 }
 
-func makeDownloadInfo(URL string) (downloadInfo, error) {
-	u, err := url.Parse(URL)
-	if err != nil {
-		return downloadInfo{}, fmt.Errorf("unable to parse %s:%v", err, URL)
+func getHTTPTransport(HTTPProxy, HTTPSProxy, NoProxy string) *http.Transport {
+	proxyCfg := httpproxy.Config{
+		HTTPProxy:  HTTPProxy,
+		HTTPSProxy: HTTPSProxy,
+		NoProxy:    NoProxy,
 	}
-	di := downloadInfo{
-		imageName: filepath.Base(u.Path),
+	proxyFunc := proxyCfg.ProxyFunc()
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+
+	return &http.Transport{
+		Proxy: func(req *http.Request) (*url.URL, error) {
+			return proxyFunc(req.URL)
+		},
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          defaultTransport.MaxIdleConns,
+		IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
 	}
-	di.imageTmpName = di.imageName + ".part"
-	return di, nil
 }
 
-func getFile(ctx context.Context, URL string, dest io.WriteCloser, cb progressCB) (err error) {
+func makeFileName(URL string) (string, error) {
+	u, err := url.Parse(URL)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse %s:%v", err, URL)
+	}
+	return filepath.Base(u.Path), nil
+}
+
+func getFile(ctx context.Context, name, URL string, transport *http.Transport,
+	dest io.WriteCloser, progressCh chan updateInfo) (err error) {
 	defer func() {
 		err1 := dest.Close()
 		if err == nil && err1 != nil {
@@ -85,7 +145,9 @@ func getFile(ctx context.Context, URL string, dest io.WriteCloser, cb progressCB
 		return
 	}
 	req = req.WithContext(ctx)
-	cli := &http.Client{Transport: http.DefaultTransport}
+	cli := &http.Client{
+		Transport: transport,
+	}
 	resp, err := cli.Do(req)
 	if err != nil {
 		return
@@ -98,7 +160,11 @@ func getFile(ctx context.Context, URL string, dest io.WriteCloser, cb progressCB
 		return
 	}
 
-	pr := &progressReader{reader: resp.Body, cb: cb}
+	pr := &progressReader{
+		reader:     resp.Body,
+		progressCh: progressCh,
+		name:       name,
+	}
 	if resp.ContentLength == -1 {
 		pr.totalMB = -1
 	} else {
@@ -108,44 +174,26 @@ func getFile(ctx context.Context, URL string, dest io.WriteCloser, cb progressCB
 	buf := make([]byte, 1<<20)
 	_, err = io.CopyBuffer(dest, pr, buf)
 
-	if err == nil && int(pr.downloaded/1000000)%10 != 0 {
-		cb(progress{downloadedMB: pr.totalMB, totalMB: pr.totalMB})
+	if err == nil {
+		progressCh <- updateInfo{
+			downloadUpdate: downloadUpdate{
+				p: progress{
+					downloadedMB: pr.totalMB,
+					totalMB:      pr.totalMB,
+					complete:     true,
+				},
+			},
+			name: name,
+		}
 	}
 
 	return
 }
 
-func downloadProgress(p progress) {
-	if p.totalMB >= 0 {
-		fmt.Printf("Downloaded %d MB of %d\n", p.downloadedMB, p.totalMB)
-	} else {
-		fmt.Printf("Downloaded %d MB\n", p.downloadedMB)
-	}
-}
-
-func downloadFile(ctx context.Context, URL, ccvmDir string, cb progressCB) (string, error) {
-	di, err := makeDownloadInfo(URL)
-	if err != nil {
-		return "", err
-	}
-
-	cacheDir := path.Join(ccvmDir, "cache")
-	imgPath := path.Join(cacheDir, di.imageName)
-
-	if _, err := os.Stat(imgPath); err == nil {
-		return imgPath, nil
-	}
-
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return "", fmt.Errorf("Unable to create directory %s : %v",
-			cacheDir, err)
-	}
-
-	tmpImgPath := path.Join(cacheDir, di.imageTmpName)
-
-	if _, err := os.Stat(imgPath); err == nil {
-		return imgPath, nil
-	}
+func prepareDownload(ctx context.Context, cacheDir, name, URL string,
+	transport *http.Transport, progressCh chan updateInfo) error {
+	imgPath := path.Join(cacheDir, name)
+	tmpImgPath := path.Join(cacheDir, name+".part")
 
 	if _, err := os.Stat(tmpImgPath); err == nil {
 		_ = os.Remove(tmpImgPath)
@@ -153,22 +201,233 @@ func downloadFile(ctx context.Context, URL, ccvmDir string, cb progressCB) (stri
 
 	f, err := os.Create(tmpImgPath)
 	if err != nil {
-		return "", errors.Wrap(err, "Unable to create download file")
+		return errors.Wrap(err, "Unable to create download file")
 	}
 
-	err = getFile(ctx, URL, f, cb)
+	err = getFile(ctx, name, URL, transport, f, progressCh)
 	if err != nil {
 		_ = os.Remove(tmpImgPath)
-		return "", fmt.Errorf("Unable download file %s: %v",
-			URL, err)
+		return errors.Wrapf(err, "Unable download file %s", URL)
 	}
 
 	err = os.Rename(tmpImgPath, imgPath)
 	if err != nil {
 		_ = os.Remove(tmpImgPath)
-		return "", fmt.Errorf("Unable move downloaded file to %s: %v",
-			imgPath, err)
+		return errors.Wrapf(err, "Unable move downloaded file to %s: %v", imgPath)
 	}
 
-	return imgPath, nil
+	return nil
+}
+
+func initiateDownload(ctx context.Context, progressCh chan updateInfo, cacheDir, name, URL string,
+	transport *http.Transport, wg *sync.WaitGroup) {
+	fmt.Printf("First download of %s\n", URL)
+	if err := prepareDownload(ctx, cacheDir, name, URL, transport, progressCh); err != nil {
+		progressCh <- updateInfo{
+			downloadUpdate: downloadUpdate{
+				err: err,
+				p: progress{
+					complete: true,
+				},
+			},
+			name: name,
+		}
+	}
+	wg.Done()
+}
+
+func (d *downloader) setup(ccvmDir string) error {
+	d.files = make(map[string]*downloadedFile)
+
+	d.cacheDir = path.Join(ccvmDir, "cache")
+	if err := os.MkdirAll(d.cacheDir, 0755); err != nil {
+		return errors.Wrapf(err, "Unable to create directory %s", d.cacheDir)
+	}
+
+	_ = filepath.Walk(d.cacheDir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		fullPath := filepath.Join(d.cacheDir, info.Name())
+		if filepath.Ext(info.Name()) == ".part" {
+			fmt.Printf("Discarding partially downloaded file %s", fullPath)
+			_ = os.Remove(fullPath)
+			return nil
+		}
+		size := int(info.Size() / (1000 * 1000))
+		d.files[info.Name()] = &downloadedFile{
+			p: progress{
+				complete:     true,
+				downloadedMB: size,
+				totalMB:      size,
+			},
+		}
+		fmt.Printf("Found cached file %s %dMB\n", fullPath, size)
+
+		return nil
+	})
+
+	return nil
+}
+
+func (d *downloader) activeDownloads() bool {
+	active := 0
+	for _, f := range d.files {
+		if len(f.listeners) > 0 {
+			f.cancel()
+			active++
+		}
+	}
+
+	return active > 0
+}
+
+func processUpdate(df *downloadedFile, u updateInfo) {
+	df.p = u.p
+
+	if u.p.complete {
+		fmt.Printf("Download of %s finished\n", u.name)
+	}
+	listeners := make([]downloadRequest, 0, len(df.listeners))
+	for _, l := range df.listeners {
+		select {
+		case <-l.ctx.Done():
+			var err error
+			if !df.p.complete {
+				err = errors.New("Download request cancelled")
+			}
+			l.progress <- downloadUpdate{
+				p:   df.p,
+				err: err,
+			}
+			close(l.progress)
+		default:
+			l.progress <- downloadUpdate{
+				p:   df.p,
+				err: u.err,
+			}
+			if df.p.complete {
+				close(l.progress)
+			} else {
+				listeners = append(listeners, l)
+			}
+		}
+	}
+
+	df.listeners = listeners
+	if len(df.listeners) == 0 || df.p.complete {
+		if !df.p.complete {
+			fmt.Printf("Download of %s cancelled due to lack of interested clients\n",
+				u.name)
+		}
+		df.cancel()
+	}
+}
+
+/* TODO requestCH is a global.  It needs to go */
+func (d *downloader) start(doneCh chan struct{}, requestCh chan downloadRequest) {
+	shuttingDown := false
+	progressCh := make(chan updateInfo)
+
+	var wg sync.WaitGroup
+
+DONE:
+	for {
+		select {
+		case <-doneCh:
+			if !d.activeDownloads() {
+				break DONE
+			} else {
+				shuttingDown = true
+				doneCh = nil
+			}
+		case r := <-requestCh:
+			if shuttingDown {
+				r.progress <- downloadUpdate{
+					err: errors.New("Download manager shutting down"),
+				}
+				close(r.progress)
+				continue
+			}
+			name, err := makeFileName(r.URL)
+			if err != nil {
+				r.progress <- downloadUpdate{
+					err: nil,
+				}
+				close(r.progress)
+				continue
+			}
+			df, ok := d.files[name]
+			if ok {
+				if df.p.complete {
+					fmt.Printf("Download of %s finished\n", name)
+					r.progress <- downloadUpdate{
+						p:   df.p,
+						err: nil,
+					}
+					close(r.progress)
+				} else {
+					df.listeners = append(df.listeners, r)
+				}
+				continue
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			d.files[name] = &downloadedFile{
+				listeners: []downloadRequest{
+					r,
+				},
+				ctx:    ctx,
+				cancel: cancel,
+			}
+			wg.Add(1)
+			go initiateDownload(ctx, progressCh, d.cacheDir, name, r.URL, r.transport, &wg)
+		case u := <-progressCh:
+			df, ok := d.files[u.name]
+			if !ok {
+				fmt.Printf("Warning: %s is not being downloaded\n", u.name)
+				continue
+			}
+
+			processUpdate(df, u)
+
+			if u.err != nil {
+				fmt.Printf("Download of %s failed: %v\n", u.name, u.err)
+				delete(d.files, u.name)
+			}
+
+			if shuttingDown && !d.activeDownloads() {
+				break DONE
+			}
+		}
+	}
+
+	wg.Wait()
+}
+
+func downloadFile(ctx context.Context, transport *http.Transport, URL, ccvmDir string,
+	progress progressCB) (string, error) {
+	fmt.Printf("Downloading %s\n", URL)
+	name, err := makeFileName(URL)
+	if err != nil {
+		return "", err
+	}
+	progressCh := make(chan downloadUpdate)
+	downloadCh <- downloadRequest{
+		progress:  progressCh,
+		URL:       URL,
+		ctx:       ctx,
+		transport: transport,
+	}
+	fmt.Printf("request sent %s\n", URL)
+	var d downloadUpdate
+	for d = range progressCh {
+		if d.err == nil {
+			progress(d.p)
+		}
+	}
+	if d.err != nil {
+		return "", d.err
+	}
+	return filepath.Join(ccvmDir, "cache", name), nil
 }
