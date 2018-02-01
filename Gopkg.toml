@@ -26,6 +26,10 @@
   revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
 
 [[constraint]]
+  name = "github.com/coreos/go-systemd"
+  version = "v15"
+
+[[constraint]]
   name = "github.com/pmezard/go-difflib"
   version = "1.0.0"
 
