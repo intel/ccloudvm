@@ -42,12 +42,14 @@ type progress struct {
 }
 
 type downloadUpdate struct {
-	p   progress
-	err error
+	p    progress
+	err  error
+	path string
 }
 
 type updateInfo struct {
-	downloadUpdate
+	p    progress
+	err  error
 	name string
 }
 
@@ -71,6 +73,7 @@ type downloadedFile struct {
 	cancel    context.CancelFunc
 	p         progress
 	listeners []downloadRequest
+	path      string
 }
 
 type downloader struct {
@@ -86,11 +89,9 @@ func (pr *progressReader) Read(p []byte) (int, error) {
 		newMB := pr.downloaded / 10000000
 		if newMB > oldMB {
 			pr.progressCh <- updateInfo{
-				downloadUpdate: downloadUpdate{
-					p: progress{
-						downloadedMB: int(newMB * 10),
-						totalMB:      pr.totalMB,
-					},
+				p: progress{
+					downloadedMB: int(newMB * 10),
+					totalMB:      pr.totalMB,
 				},
 				name: pr.name,
 			}
@@ -176,12 +177,10 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 
 	if err == nil {
 		progressCh <- updateInfo{
-			downloadUpdate: downloadUpdate{
-				p: progress{
-					downloadedMB: pr.totalMB,
-					totalMB:      pr.totalMB,
-					complete:     true,
-				},
+			p: progress{
+				downloadedMB: pr.totalMB,
+				totalMB:      pr.totalMB,
+				complete:     true,
 			},
 			name: name,
 		}
@@ -190,10 +189,9 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 	return
 }
 
-func prepareDownload(ctx context.Context, cacheDir, name, URL string,
+func prepareDownload(ctx context.Context, imgPath, name, URL string,
 	transport *http.Transport, progressCh chan updateInfo) error {
-	imgPath := path.Join(cacheDir, name)
-	tmpImgPath := path.Join(cacheDir, name+".part")
+	tmpImgPath := imgPath + ".part"
 
 	if _, err := os.Stat(tmpImgPath); err == nil {
 		_ = os.Remove(tmpImgPath)
@@ -219,16 +217,14 @@ func prepareDownload(ctx context.Context, cacheDir, name, URL string,
 	return nil
 }
 
-func initiateDownload(ctx context.Context, progressCh chan updateInfo, cacheDir, name, URL string,
+func initiateDownload(ctx context.Context, progressCh chan updateInfo, imgPath, name, URL string,
 	transport *http.Transport, wg *sync.WaitGroup) {
 	fmt.Printf("First download of %s\n", URL)
-	if err := prepareDownload(ctx, cacheDir, name, URL, transport, progressCh); err != nil {
+	if err := prepareDownload(ctx, imgPath, name, URL, transport, progressCh); err != nil {
 		progressCh <- updateInfo{
-			downloadUpdate: downloadUpdate{
-				err: err,
-				p: progress{
-					complete: true,
-				},
+			err: err,
+			p: progress{
+				complete: true,
 			},
 			name: name,
 		}
@@ -262,6 +258,7 @@ func (d *downloader) setup(ccvmDir string) error {
 				downloadedMB: size,
 				totalMB:      size,
 			},
+			path: filepath.Join(d.cacheDir, info.Name()),
 		}
 		fmt.Printf("Found cached file %s %dMB\n", fullPath, size)
 
@@ -298,14 +295,16 @@ func processUpdate(df *downloadedFile, u updateInfo) {
 				err = errors.New("Download request cancelled")
 			}
 			l.progress <- downloadUpdate{
-				p:   df.p,
-				err: err,
+				p:    df.p,
+				err:  err,
+				path: df.path,
 			}
 			close(l.progress)
 		default:
 			l.progress <- downloadUpdate{
-				p:   df.p,
-				err: u.err,
+				p:    df.p,
+				err:  u.err,
+				path: df.path,
 			}
 			if df.p.complete {
 				close(l.progress)
@@ -363,8 +362,9 @@ DONE:
 				if df.p.complete {
 					fmt.Printf("Download of %s finished\n", name)
 					r.progress <- downloadUpdate{
-						p:   df.p,
-						err: nil,
+						p:    df.p,
+						err:  nil,
+						path: df.path,
 					}
 					close(r.progress)
 				} else {
@@ -373,15 +373,17 @@ DONE:
 				continue
 			}
 			ctx, cancel := context.WithCancel(context.Background())
+			imgPath := filepath.Join(d.cacheDir, name)
 			d.files[name] = &downloadedFile{
 				listeners: []downloadRequest{
 					r,
 				},
 				ctx:    ctx,
 				cancel: cancel,
+				path:   imgPath,
 			}
 			wg.Add(1)
-			go initiateDownload(ctx, progressCh, d.cacheDir, name, r.URL, r.transport, &wg)
+			go initiateDownload(ctx, progressCh, imgPath, name, r.URL, r.transport, &wg)
 		case u := <-progressCh:
 			df, ok := d.files[u.name]
 			if !ok {
@@ -405,13 +407,8 @@ DONE:
 	wg.Wait()
 }
 
-func downloadFile(ctx context.Context, transport *http.Transport, URL, ccvmDir string,
-	progress progressCB) (string, error) {
+func downloadFile(ctx context.Context, transport *http.Transport, URL string, progress progressCB) (string, error) {
 	fmt.Printf("Downloading %s\n", URL)
-	name, err := makeFileName(URL)
-	if err != nil {
-		return "", err
-	}
 	progressCh := make(chan downloadUpdate)
 	downloadCh <- downloadRequest{
 		progress:  progressCh,
@@ -429,5 +426,5 @@ func downloadFile(ctx context.Context, transport *http.Transport, URL, ccvmDir s
 	if d.err != nil {
 		return "", d.err
 	}
-	return filepath.Join(ccvmDir, "cache", name), nil
+	return d.path, nil
 }

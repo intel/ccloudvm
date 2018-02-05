@@ -147,12 +147,11 @@ func quitVM(ctx context.Context, instanceDir string) error {
 	})
 }
 
-func serveLocalFile(ctx context.Context, transport *http.Transport, ccvmDir string,
-	w http.ResponseWriter, r *http.Request) {
+func serveLocalFile(ctx context.Context, transport *http.Transport, w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	URL := params.Get(urlParam)
 
-	path, err := downloadFile(ctx, transport, URL, ccvmDir, func(progress) {})
+	path, err := downloadFile(ctx, transport, URL, func(progress) {})
 	if err != nil {
 		// May not be the correct error code but the error message is only going
 		// to end up in cloud-init's logs.
@@ -175,8 +174,7 @@ func serveLocalFile(ctx context.Context, transport *http.Transport, ccvmDir stri
 }
 
 func startHTTPServer(ctx context.Context, resultCh chan interface{},
-	transport *http.Transport,
-	ccvmDir string, listener net.Listener, errCh chan error) {
+	transport *http.Transport, listener net.Listener, errCh chan error) {
 	finished := false
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +198,7 @@ func startHTTPServer(ctx context.Context, resultCh chan interface{},
 	})
 
 	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
-		serveLocalFile(ctx, transport, ccvmDir, w, r)
+		serveLocalFile(ctx, transport, w, r)
 	})
 
 	server := &http.Server{
@@ -217,7 +215,7 @@ func startHTTPServer(ctx context.Context, resultCh chan interface{},
 }
 
 func manageInstallation(ctx context.Context, resultCh chan interface{},
-	transport *http.Transport, ccvmDir, instanceDir string, ws *workspace) error {
+	transport *http.Transport, instanceDir string, ws *workspace) error {
 	socket := path.Join(instanceDir, "socket")
 	disconnectedCh := make(chan struct{})
 
@@ -248,7 +246,7 @@ func manageInstallation(ctx context.Context, resultCh chan interface{},
 	}
 
 	errCh := make(chan error)
-	startHTTPServer(ctx, resultCh, transport, ccvmDir, listener, errCh)
+	startHTTPServer(ctx, resultCh, transport, listener, errCh)
 	select {
 	case <-ctx.Done():
 		_ = listener.Close()

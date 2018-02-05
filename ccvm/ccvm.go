@@ -120,10 +120,9 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 
 	resultCh <- fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName)
 
-	qcowPath, err := downloadFile(ctx, transport, wkld.spec.BaseImageURL, ws.ccvmDir,
-		func(p progress) {
-			downloadProgress(resultCh, p)
-		})
+	qcowPath, err := downloadFile(ctx, transport, wkld.spec.BaseImageURL, func(p progress) {
+		downloadProgress(resultCh, p)
+	})
 	if err != nil {
 		return err
 	}
@@ -146,7 +145,7 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 		return err
 	}
 
-	err = manageInstallation(ctx, resultCh, transport, ws.ccvmDir, ws.instanceDir, ws)
+	err = manageInstallation(ctx, resultCh, transport, ws.instanceDir, ws)
 	if err != nil {
 		return err
 	}
