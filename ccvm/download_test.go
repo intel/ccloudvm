@@ -220,10 +220,9 @@ func TestDownload(t *testing.T) {
 		t.Fatalf("Unable to start download manager")
 	}
 
-	doneCh := make(chan struct{})
 	wg.Add(1)
 	go func() {
-		d.start(doneCh, downloadCh)
+		d.start(ctx.Done(), downloadCh)
 		wg.Done()
 	}()
 
@@ -253,8 +252,7 @@ func TestDownload(t *testing.T) {
 	t.Run("doubledifferent", func(t *testing.T) {
 		testDownloadDoubleDifferent(ctx, t, addr, ccvmDir)
 	})
-
+	cancel()
 	_ = server.Shutdown(context.Background())
-	close(doneCh)
 	wg.Wait()
 }

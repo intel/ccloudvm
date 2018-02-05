@@ -326,7 +326,7 @@ func processUpdate(df *downloadedFile, u updateInfo) {
 }
 
 /* TODO requestCH is a global.  It needs to go */
-func (d *downloader) start(doneCh chan struct{}, requestCh chan downloadRequest) {
+func (d *downloader) start(doneCh <-chan struct{}, requestCh chan downloadRequest) {
 	shuttingDown := false
 	progressCh := make(chan updateInfo)
 
