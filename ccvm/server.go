@@ -35,16 +35,13 @@ import (
 )
 
 var systemd bool
-var downloadCh chan downloadRequest
 
 func init() {
 	flag.BoolVar(&systemd, "systemd", true, "Use systemd socket activation if true")
-
-	downloadCh = make(chan downloadRequest)
 }
 
 type startAction struct {
-	action  func(context.Context, chan interface{})
+	action  func(context.Context, chan interface{}, chan<- downloadRequest)
 	transCh chan int
 }
 
@@ -63,6 +60,7 @@ type transaction struct {
 }
 
 type service struct {
+	downloadCh    chan<- downloadRequest
 	counter       int
 	shutdownTimer *time.Timer
 	timerCh       <-chan time.Time
@@ -94,7 +92,7 @@ func (s *service) processAction(action interface{}) {
 		}
 		a.transCh <- s.counter
 		s.counter++
-		go a.action(ctx, resultCh)
+		go a.action(ctx, resultCh, s.downloadCh)
 	case cancelAction:
 		fmt.Fprintf(os.Stderr, "Cancelling %d\n", int(a))
 		t, ok := s.transactions[int(a)]
@@ -228,6 +226,7 @@ func startServer(signalCh chan os.Signal) error {
 
 	var wg sync.WaitGroup
 
+	downloadCh := make(chan downloadRequest)
 	d := downloader{}
 	err = d.setup(ccvmDir)
 	if err != nil {
@@ -248,7 +247,9 @@ func startServer(signalCh chan os.Signal) error {
 
 	wg.Add(1)
 	go func() {
-		svc := &service{}
+		svc := &service{
+			downloadCh: downloadCh,
+		}
 		svc.run(doneCh, api.actionCh)
 		close(finishedCh)
 		wg.Done()

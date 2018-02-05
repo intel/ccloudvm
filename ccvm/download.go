@@ -324,7 +324,6 @@ func processUpdate(df *downloadedFile, u updateInfo) {
 	}
 }
 
-/* TODO requestCH is a global.  It needs to go */
 func (d *downloader) start(doneCh <-chan struct{}, requestCh chan downloadRequest) {
 	shuttingDown := false
 	progressCh := make(chan updateInfo)
@@ -407,7 +406,8 @@ DONE:
 	wg.Wait()
 }
 
-func downloadFile(ctx context.Context, transport *http.Transport, URL string, progress progressCB) (string, error) {
+func downloadFile(ctx context.Context, downloadCh chan<- downloadRequest, transport *http.Transport, URL string,
+	progress progressCB) (string, error) {
 	fmt.Printf("Downloading %s\n", URL)
 	progressCh := make(chan downloadUpdate)
 	downloadCh <- downloadRequest{

@@ -65,8 +65,8 @@ func startTestHTTPServer(wg *sync.WaitGroup) (*http.Server, string, error) {
 	return server, listener.Addr().String(), nil
 }
 
-func testDownloadSingle(ctx context.Context, t *testing.T, addr, ccvmDir string) {
-	path, err := downloadFile(ctx, http.DefaultTransport.(*http.Transport),
+func testDownloadSingle(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
+	path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
 		"http://"+addr+"/download/one", func(p progress) {})
 	if err != nil {
 		t.Errorf("Failed to download file : %v", err)
@@ -77,12 +77,12 @@ func testDownloadSingle(ctx context.Context, t *testing.T, addr, ccvmDir string)
 	}
 }
 
-func testDownloadDouble(ctx context.Context, t *testing.T, addr, ccvmDir string) {
+func testDownloadDouble(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
 	pathChans := []chan string{make(chan string), make(chan string)}
 
 	for _, ch := range pathChans {
 		go func(ch chan string) {
-			path, err := downloadFile(ctx, http.DefaultTransport.(*http.Transport),
+			path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
 				"http://"+addr+"/download/double", func(p progress) {})
 			if err != nil {
 				t.Errorf("Failed to download file : %v", err)
@@ -103,13 +103,13 @@ func testDownloadDouble(ctx context.Context, t *testing.T, addr, ccvmDir string)
 	}
 }
 
-func testDownloadDoubleDifferent(ctx context.Context, t *testing.T, addr, ccvmDir string) {
+func testDownloadDoubleDifferent(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
 	pathChans := []chan string{make(chan string), make(chan string)}
 
 	for i, ch := range pathChans {
 		go func(ch chan string, i int) {
 			url := fmt.Sprintf("http://%s/download/double-%d", addr, i)
-			path, err := downloadFile(ctx, http.DefaultTransport.(*http.Transport),
+			path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
 				url, func(p progress) {})
 			if err != nil {
 				t.Errorf("Failed to download file : %v", err)
@@ -132,7 +132,7 @@ func testDownloadDoubleDifferent(ctx context.Context, t *testing.T, addr, ccvmDi
 	}
 }
 
-func testDownloadCancelSingle(ctx context.Context, t *testing.T, addr, ccvmDir string) {
+func testDownloadCancelSingle(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
 	type dld struct {
 		path string
 		err  error
@@ -142,7 +142,7 @@ func testDownloadCancelSingle(ctx context.Context, t *testing.T, addr, ccvmDir s
 	ctx, cancel := context.WithCancel(ctx)
 	cancel()
 	go func() {
-		path, err := downloadFile(ctx, http.DefaultTransport.(*http.Transport),
+		path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
 			"http://"+addr+"/download/singlecancel", func(p progress) {})
 		ch <- dld{path, err}
 	}()
@@ -155,7 +155,7 @@ func testDownloadCancelSingle(ctx context.Context, t *testing.T, addr, ccvmDir s
 	}
 }
 
-func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, addr, ccvmDir string) {
+func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
 	type dld struct {
 		path string
 		err  error
@@ -172,7 +172,7 @@ func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, addr, ccvmDir
 
 	for _, p := range params {
 		go func(ctx context.Context, ch chan dld) {
-			path, err := downloadFile(ctx, http.DefaultTransport.(*http.Transport),
+			path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
 				"http://"+addr+"/download/oneoftwo", func(p progress) {})
 			ch <- dld{path, err}
 		}(p.ctx, p.ch)
@@ -192,8 +192,8 @@ func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, addr, ccvmDir
 	}
 }
 
-func testDownloadError(ctx context.Context, t *testing.T, addr, ccvmDir string) {
-	_, err := downloadFile(ctx, http.DefaultTransport.(*http.Transport),
+func testDownloadError(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
+	_, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
 		"http://"+addr+"/error", func(p progress) {})
 	if err == nil {
 		t.Errorf("Expected download to fail")
@@ -215,6 +215,7 @@ func TestDownload(t *testing.T) {
 	}()
 
 	d := downloader{}
+	downloadCh := make(chan downloadRequest)
 	err = d.setup(ccvmDir)
 	if err != nil {
 		t.Fatalf("Unable to start download manager")
@@ -232,25 +233,25 @@ func TestDownload(t *testing.T) {
 	}
 
 	t.Run("single", func(t *testing.T) {
-		testDownloadSingle(ctx, t, addr, ccvmDir)
+		testDownloadSingle(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	t.Run("single-repeat", func(t *testing.T) {
-		testDownloadSingle(ctx, t, addr, ccvmDir)
+		testDownloadSingle(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	t.Run("double", func(t *testing.T) {
-		testDownloadDouble(ctx, t, addr, ccvmDir)
+		testDownloadDouble(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	t.Run("cancelsingle", func(t *testing.T) {
-		testDownloadCancelSingle(ctx, t, addr, ccvmDir)
+		testDownloadCancelSingle(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	t.Run("canceloneoftwo", func(t *testing.T) {
-		testDownloadCancelOneOfTwo(ctx, t, addr, ccvmDir)
+		testDownloadCancelOneOfTwo(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	t.Run("error", func(t *testing.T) {
-		testDownloadError(ctx, t, addr, ccvmDir)
+		testDownloadError(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	t.Run("doubledifferent", func(t *testing.T) {
-		testDownloadDoubleDifferent(ctx, t, addr, ccvmDir)
+		testDownloadDoubleDifferent(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	cancel()
 	_ = server.Shutdown(context.Background())

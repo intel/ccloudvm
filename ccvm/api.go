@@ -48,7 +48,7 @@ type ServerAPI struct {
 	actionCh chan interface{}
 }
 
-func (s *ServerAPI) sendStartAction(fn func(context.Context, chan interface{}), id *int) {
+func (s *ServerAPI) sendStartAction(fn func(context.Context, chan interface{}, chan<- downloadRequest), id *int) {
 	action := startAction{
 		action:  fn,
 		transCh: make(chan int),
@@ -93,8 +93,8 @@ func (s *ServerAPI) Cancel(arg int, reply *struct{}) error {
 func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
 	fmt.Printf("Create %+v called\n", *args)
 
-	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
-		resultCh <- Create(ctx, resultCh, args)
+	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest) {
+		resultCh <- Create(ctx, resultCh, downloadCh, args)
 	}, id)
 
 	fmt.Printf("Transaction ID %d\n", *id)
@@ -149,7 +149,7 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 func (s *ServerAPI) Stop(args struct{}, id *int) error {
 	fmt.Println("Stop called")
 
-	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest) {
 		resultCh <- Stop(ctx)
 	}, id)
 
@@ -171,7 +171,7 @@ func (s *ServerAPI) StopResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Start(vmSpec *types.VMSpec, id *int) error {
 	fmt.Println("Start called")
 
-	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest) {
 		resultCh <- Start(ctx, vmSpec)
 	}, id)
 
@@ -193,7 +193,7 @@ func (s *ServerAPI) StartResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Quit(args struct{}, id *int) error {
 	fmt.Println("Quit called")
 
-	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest) {
 		resultCh <- Quit(ctx)
 	}, id)
 
@@ -215,7 +215,7 @@ func (s *ServerAPI) QuitResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Delete(args struct{}, id *int) error {
 	fmt.Println("Delete called")
 
-	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest) {
 		resultCh <- Delete(ctx)
 	}, id)
 
@@ -237,7 +237,7 @@ func (s *ServerAPI) DeleteResult(id int, reply *struct{}) error {
 func (s *ServerAPI) GetInstanceDetails(args struct{}, id *int) error {
 	fmt.Println("GetInstanceDetails called")
 
-	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest) {
 		details, err := Status(ctx)
 		result := getInstanceComplete{
 			err: err,

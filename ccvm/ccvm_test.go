@@ -197,6 +197,7 @@ func TestSystem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to create downloaded:  %v", err)
 	}
+	downloadCh := make(chan downloadRequest)
 	doneCh := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -205,7 +206,7 @@ func TestSystem(t *testing.T) {
 		wg.Done()
 	}()
 
-	err = Create(ctx, resultCh, createArgs)
+	err = Create(ctx, resultCh, downloadCh, createArgs)
 	close(resultCh)
 	if err != nil {
 		t.Fatalf("Unable to create VM: %v", err)

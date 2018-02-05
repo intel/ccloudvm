@@ -79,7 +79,7 @@ func downloadProgress(resultCh chan interface{}, p progress) {
 }
 
 // Create sets up the VM
-func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) error {
+func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
 	var err error
 
 	wkld, ws, transport, err := prepareCreate(ctx, args)
@@ -120,7 +120,7 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 
 	resultCh <- fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName)
 
-	qcowPath, err := downloadFile(ctx, transport, wkld.spec.BaseImageURL, func(p progress) {
+	qcowPath, err := downloadFile(ctx, downloadCh, transport, wkld.spec.BaseImageURL, func(p progress) {
 		downloadProgress(resultCh, p)
 	})
 	if err != nil {
@@ -145,7 +145,7 @@ func Create(ctx context.Context, resultCh chan interface{}, args *types.CreateAr
 		return err
 	}
 
-	err = manageInstallation(ctx, resultCh, transport, ws.instanceDir, ws)
+	err = manageInstallation(ctx, resultCh, downloadCh, transport, ws.instanceDir, ws)
 	if err != nil {
 		return err
 	}
