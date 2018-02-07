@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"syscall"
 	"time"
@@ -33,6 +34,13 @@ import (
 	"github.com/coreos/go-systemd/activation"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
+)
+
+// Indicies of the first three channels in service.cases
+const (
+	DoneChIndex = iota
+	ActionChIndex
+	TimeChIndex
 )
 
 var systemd bool
@@ -64,9 +72,9 @@ type service struct {
 	downloadCh    chan<- downloadRequest
 	counter       int
 	shutdownTimer *time.Timer
-	timerCh       <-chan time.Time
 	transactions  map[int]transaction
 	shuttingDown  bool
+	cases         []reflect.SelectCase
 }
 
 func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
@@ -120,7 +128,7 @@ func (s *service) processAction(action interface{}) {
 				_ = <-s.shutdownTimer.C
 			}
 			s.shutdownTimer = nil
-			s.timerCh = nil
+			s.cases[TimeChIndex].Chan = reflect.ValueOf(nil)
 		}
 		a.transCh <- s.counter
 		s.counter++
@@ -152,7 +160,7 @@ func (s *service) processAction(action interface{}) {
 					shutdownIn = time.Second * 0
 				}
 				s.shutdownTimer = time.NewTimer(shutdownIn)
-				s.timerCh = s.shutdownTimer.C
+				s.cases[TimeChIndex].Chan = reflect.ValueOf(s.shutdownTimer.C)
 			}
 		}
 	}
@@ -163,10 +171,26 @@ func (s *service) run(doneCh chan struct{}, actionCh chan interface{}) {
 
 	fmt.Println("Starting Service")
 
+	s.cases = []reflect.SelectCase{
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(doneCh),
+		},
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(actionCh),
+		},
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(nil),
+		},
+	}
+
 DONE:
 	for {
-		select {
-		case <-doneCh:
+		index, value, _ := reflect.Select(s.cases)
+		switch index {
+		case DoneChIndex:
 			fmt.Printf("Signal received active transactions = %d\n", len(s.transactions))
 			if s.shutdownTimer != nil {
 				if !s.shutdownTimer.Stop() {
@@ -180,10 +204,10 @@ DONE:
 			for _, t := range s.transactions {
 				t.cancel()
 			}
-			doneCh = nil
-		case action := <-actionCh:
-			s.processAction(action)
-		case <-s.timerCh:
+			s.cases[DoneChIndex].Chan = reflect.ValueOf(nil)
+		case ActionChIndex:
+			s.processAction(value.Interface())
+		case TimeChIndex:
 			break DONE
 		}
 	}
