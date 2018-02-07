@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/activation"
+	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
 
@@ -41,7 +42,7 @@ func init() {
 }
 
 type startAction struct {
-	action  func(context.Context, chan interface{}, chan<- downloadRequest)
+	action  func(ctx context.Context, s *service, resultCh chan interface{})
 	transCh chan int
 }
 
@@ -68,6 +69,37 @@ type service struct {
 	shuttingDown  bool
 }
 
+func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
+	resultCh <- Create(ctx, resultCh, s.downloadCh, args)
+}
+
+func (s *service) stop(ctx context.Context, resultCh chan interface{}) {
+	resultCh <- Stop(ctx)
+}
+
+func (s *service) start(ctx context.Context, resultCh chan interface{}, vmSpec *types.VMSpec) {
+	resultCh <- Start(ctx, vmSpec)
+}
+
+func (s *service) quit(ctx context.Context, resultCh chan interface{}) {
+	resultCh <- Quit(ctx)
+}
+
+func (s *service) delete(ctx context.Context, resultCh chan interface{}) {
+	resultCh <- Delete(ctx)
+}
+
+func (s *service) status(ctx context.Context, resultCh chan interface{}) {
+	details, err := Status(ctx)
+	result := getInstanceComplete{
+		err: err,
+	}
+	if err == nil {
+		result.details = *details
+	}
+	resultCh <- result
+}
+
 func (s *service) processAction(action interface{}) {
 	switch a := action.(type) {
 	case startAction:
@@ -92,7 +124,7 @@ func (s *service) processAction(action interface{}) {
 		}
 		a.transCh <- s.counter
 		s.counter++
-		go a.action(ctx, resultCh, s.downloadCh)
+		go a.action(ctx, s, resultCh)
 	case cancelAction:
 		fmt.Fprintf(os.Stderr, "Cancelling %d\n", int(a))
 		t, ok := s.transactions[int(a)]
