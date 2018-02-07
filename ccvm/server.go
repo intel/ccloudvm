@@ -151,9 +151,21 @@ func (s *service) startInstanceLoop(name string) chan instanceCmd {
 }
 
 func (s *service) findExistingInstances() {
-	if _, err := os.Stat(filepath.Join(s.ccvmDir, "instance")); err == nil {
-		_ = s.startInstanceLoop("instance")
-	}
+	instancesDir := filepath.Join(s.ccvmDir, "instances")
+
+	_ = filepath.Walk(instancesDir, func(path string, info os.FileInfo, err error) error {
+		if path == instancesDir {
+			return nil
+		}
+
+		if !info.IsDir() {
+			return nil
+		}
+
+		_ = s.startInstanceLoop(info.Name())
+
+		return filepath.SkipDir
+	})
 }
 
 func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
@@ -161,6 +173,8 @@ func (s *service) create(ctx context.Context, resultCh chan interface{}, args *t
 		resultCh <- errors.New("Instance already exists")
 		return
 	}
+
+	args.Name = "instance"
 
 	instanceCh := s.startInstanceLoop("instance")
 	instanceCh <- instanceCmd{
@@ -183,7 +197,7 @@ func (s *service) stop(ctx context.Context, resultCh chan interface{}) {
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Stop(ctx)
+			resultCh <- Stop(ctx, "instance")
 			return nil
 		},
 	}
@@ -200,7 +214,7 @@ func (s *service) start(ctx context.Context, resultCh chan interface{}, vmSpec *
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Start(ctx, vmSpec)
+			resultCh <- Start(ctx, "instance", vmSpec)
 			return nil
 		},
 	}
@@ -217,7 +231,7 @@ func (s *service) quit(ctx context.Context, resultCh chan interface{}) {
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Quit(ctx)
+			resultCh <- Quit(ctx, "instance")
 			return nil
 		},
 	}
@@ -234,7 +248,7 @@ func (s *service) delete(ctx context.Context, resultCh chan interface{}) {
 		cmdType:  instanceCmdDelete,
 		resultCh: resultCh,
 		fn: func() error {
-			return Delete(ctx)
+			return Delete(ctx, "instance")
 		},
 	}
 }
@@ -250,7 +264,7 @@ func (s *service) status(ctx context.Context, resultCh chan interface{}) {
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			details, err := Status(ctx)
+			details, err := Status(ctx, "instance")
 			if err != nil {
 				resultCh <- err
 			} else {

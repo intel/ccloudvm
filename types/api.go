@@ -19,6 +19,7 @@ package types
 // CreateArgs contains all the information necessary to create a new
 // ccloudvm instance.
 type CreateArgs struct {
+	Name         string
 	WorkloadName string
 	Debug        bool
 	Update       bool

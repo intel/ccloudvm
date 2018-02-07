@@ -27,7 +27,7 @@ import (
 )
 
 func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *workspace, *http.Transport, error) {
-	ws, err := prepareEnv(ctx)
+	ws, err := prepareEnv(ctx, args.Name)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -157,8 +157,8 @@ func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- do
 }
 
 // Start launches the VM
-func Start(ctx context.Context, customSpec *types.VMSpec) error {
-	ws, err := prepareEnv(ctx)
+func Start(ctx context.Context, name string, customSpec *types.VMSpec) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -203,8 +203,8 @@ func Start(ctx context.Context, customSpec *types.VMSpec) error {
 }
 
 // Stop requests the VM shuts down cleanly
-func Stop(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func Stop(ctx context.Context, name string) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -220,8 +220,8 @@ func Stop(ctx context.Context) error {
 }
 
 // Quit forceably kills VM
-func Quit(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func Quit(ctx context.Context, name string) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -237,8 +237,8 @@ func Quit(ctx context.Context) error {
 }
 
 // Status prints out VM information
-func Status(ctx context.Context) (*types.InstanceDetails, error) {
-	ws, err := prepareEnv(ctx)
+func Status(ctx context.Context, name string) (*types.InstanceDetails, error) {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -265,8 +265,8 @@ func Status(ctx context.Context) (*types.InstanceDetails, error) {
 }
 
 // Delete the VM
-func Delete(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func Delete(ctx context.Context, name string) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}

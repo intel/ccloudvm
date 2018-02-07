@@ -176,7 +176,9 @@ func TestSystem(t *testing.T) {
 		},
 	}
 
+	name := makeRandomName() + "-test"
 	createArgs := &types.CreateArgs{
+		Name:         name,
 		WorkloadName: "semaphore",
 		CustomSpec:   *vmSpec,
 		Debug:        true,
@@ -214,17 +216,17 @@ func TestSystem(t *testing.T) {
 	close(doneCh)
 	wg.Wait()
 
-	err = Start(ctx, vmSpec)
+	err = Start(ctx, name, vmSpec)
 	if err == nil || err == context.DeadlineExceeded {
 		t.Errorf("Start expected to fail")
 	}
 
-	err = Stop(ctx)
+	err = Stop(ctx, name)
 	if err != nil {
 		t.Errorf("Failed to Stop instance: %v", err)
 	}
 
-	err = Start(ctx, vmSpec)
+	err = Start(ctx, name, vmSpec)
 	if err != nil {
 		t.Errorf("Failed to Restart instance: %v", err)
 	}
@@ -239,12 +241,12 @@ func TestSystem(t *testing.T) {
 		t.Errorf("Instance is not available via SSH: %v", err)
 	}
 
-	err = Quit(ctx)
+	err = Quit(ctx, name)
 	if err != nil {
 		t.Errorf("Failed to Restart instance: %v", err)
 	}
 
-	err = Delete(context.Background())
+	err = Delete(context.Background(), name)
 	if err != nil {
 		t.Errorf("Failed to Delete instance: %v", err)
 	}
