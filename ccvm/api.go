@@ -24,11 +24,6 @@ import (
 	"github.com/intel/ccloudvm/types"
 )
 
-type getInstanceComplete struct {
-	details types.InstanceDetails
-	err     error
-}
-
 // ServerAPI exposes an RPC based API to the cccloudvm client.  This API can
 // be used to perform almost all ccloudvm actions.  The API has the following
 // structure.  All APIs calls are asynchronous.  The client initiates a request
@@ -261,16 +256,19 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 		fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, v)
 		return v
 	}
+
+	var err error
+
 	resultCh := r.(chan interface{})
-	res := (<-resultCh).(getInstanceComplete)
+	switch res := (<-resultCh).(type) {
+	case error:
+		err = res
+	case types.InstanceDetails:
+		*reply = res
+	}
 	s.actionCh <- completeAction(id)
 
-	fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, res.err)
+	fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, err)
 
-	if res.err != nil {
-		return res.err
-	}
-
-	*reply = res.details
-	return nil
+	return err
 }

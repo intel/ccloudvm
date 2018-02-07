@@ -68,44 +68,197 @@ type transaction struct {
 	resultCh chan interface{}
 }
 
+const (
+	instanceCmdOther = iota
+	instanceCmdCreate
+	instanceCmdDelete
+)
+
+type instanceCmd struct {
+	cmdType  int
+	resultCh chan interface{}
+	fn       func() error
+}
+
 type service struct {
+	ccvmDir       string
 	downloadCh    chan<- downloadRequest
 	counter       int
 	shutdownTimer *time.Timer
 	transactions  map[int]transaction
 	shuttingDown  bool
 	cases         []reflect.SelectCase
+	instances     map[string]chan instanceCmd
+	instanceChMap map[chan struct{}]chan instanceCmd
+	instanceWg    sync.WaitGroup
+}
+
+func instanceLoop(instanceCh <-chan instanceCmd, closeCh chan struct{}, wg *sync.WaitGroup) {
+	deleted := false
+	for cmd := range instanceCh {
+		switch cmd.cmdType {
+		case instanceCmdCreate:
+			if deleted {
+				cmd.resultCh <- errors.New("Instance already exists (but is being deleted)")
+				continue
+			}
+			err := cmd.fn()
+			cmd.resultCh <- err
+			if err != nil {
+				deleted = true
+				close(closeCh)
+			}
+		case instanceCmdDelete:
+			if deleted {
+				cmd.resultCh <- errors.New("Instance does not exist")
+				continue
+			}
+			err := cmd.fn()
+			cmd.resultCh <- err
+			if err == nil {
+				deleted = true
+				close(closeCh)
+			}
+		case instanceCmdOther:
+			if deleted {
+				cmd.resultCh <- errors.New("Instance does not exist")
+				continue
+			}
+
+			/* Instance loop is only interested in errors from create and delete */
+
+			_ = cmd.fn()
+		}
+	}
+
+	fmt.Println("Instance loop quiting")
+
+	wg.Done()
+}
+
+func (s *service) startInstanceLoop(name string) chan instanceCmd {
+	instanceCh := make(chan instanceCmd)
+	closeCh := make(chan struct{})
+	s.instances[name] = instanceCh
+	s.instanceChMap[closeCh] = instanceCh
+	s.instanceWg.Add(1)
+	go instanceLoop(instanceCh, closeCh, &s.instanceWg)
+	s.cases = append(s.cases, reflect.SelectCase{
+		Dir:  reflect.SelectRecv,
+		Chan: reflect.ValueOf(closeCh),
+	})
+	return instanceCh
+}
+
+func (s *service) findExistingInstances() {
+	if _, err := os.Stat(filepath.Join(s.ccvmDir, "instance")); err == nil {
+		_ = s.startInstanceLoop("instance")
+	}
 }
 
 func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
-	resultCh <- Create(ctx, resultCh, s.downloadCh, args)
+	if _, ok := s.instances["instance"]; ok {
+		resultCh <- errors.New("Instance already exists")
+		return
+	}
+
+	instanceCh := s.startInstanceLoop("instance")
+	instanceCh <- instanceCmd{
+		cmdType:  instanceCmdCreate,
+		resultCh: resultCh,
+		fn: func() error {
+			return Create(ctx, resultCh, s.downloadCh, args)
+		},
+	}
 }
 
 func (s *service) stop(ctx context.Context, resultCh chan interface{}) {
-	resultCh <- Stop(ctx)
+	instanceCh, ok := s.instances["instance"]
+	if !ok {
+		resultCh <- errors.New("Instance does not exist")
+		return
+	}
+
+	instanceCh <- instanceCmd{
+		cmdType:  instanceCmdOther,
+		resultCh: resultCh,
+		fn: func() error {
+			resultCh <- Stop(ctx)
+			return nil
+		},
+	}
 }
 
 func (s *service) start(ctx context.Context, resultCh chan interface{}, vmSpec *types.VMSpec) {
-	resultCh <- Start(ctx, vmSpec)
+	instanceCh, ok := s.instances["instance"]
+	if !ok {
+		resultCh <- errors.New("Instance does not exist")
+		return
+	}
+
+	instanceCh <- instanceCmd{
+		cmdType:  instanceCmdOther,
+		resultCh: resultCh,
+		fn: func() error {
+			resultCh <- Start(ctx, vmSpec)
+			return nil
+		},
+	}
 }
 
 func (s *service) quit(ctx context.Context, resultCh chan interface{}) {
-	resultCh <- Quit(ctx)
+	instanceCh, ok := s.instances["instance"]
+	if !ok {
+		resultCh <- errors.New("Instance does not exist")
+		return
+	}
+
+	instanceCh <- instanceCmd{
+		cmdType:  instanceCmdOther,
+		resultCh: resultCh,
+		fn: func() error {
+			resultCh <- Quit(ctx)
+			return nil
+		},
+	}
 }
 
 func (s *service) delete(ctx context.Context, resultCh chan interface{}) {
-	resultCh <- Delete(ctx)
+	instanceCh, ok := s.instances["instance"]
+	if !ok {
+		resultCh <- errors.New("Instance does not exist")
+		return
+	}
+
+	instanceCh <- instanceCmd{
+		cmdType:  instanceCmdDelete,
+		resultCh: resultCh,
+		fn: func() error {
+			return Delete(ctx)
+		},
+	}
 }
 
 func (s *service) status(ctx context.Context, resultCh chan interface{}) {
-	details, err := Status(ctx)
-	result := getInstanceComplete{
-		err: err,
+	instanceCh, ok := s.instances["instance"]
+	if !ok {
+		resultCh <- errors.New("Instance does not exist")
+		return
 	}
-	if err == nil {
-		result.details = *details
+
+	instanceCh <- instanceCmd{
+		cmdType:  instanceCmdOther,
+		resultCh: resultCh,
+		fn: func() error {
+			details, err := Status(ctx)
+			if err != nil {
+				resultCh <- err
+			} else {
+				resultCh <- *details
+			}
+			return nil
+		},
 	}
-	resultCh <- result
 }
 
 func (s *service) processAction(action interface{}) {
@@ -132,7 +285,7 @@ func (s *service) processAction(action interface{}) {
 		}
 		a.transCh <- s.counter
 		s.counter++
-		go a.action(ctx, s, resultCh)
+		a.action(ctx, s, resultCh)
 	case cancelAction:
 		fmt.Fprintf(os.Stderr, "Cancelling %d\n", int(a))
 		t, ok := s.transactions[int(a)]
@@ -167,10 +320,9 @@ func (s *service) processAction(action interface{}) {
 }
 
 func (s *service) run(doneCh chan struct{}, actionCh chan interface{}) {
-	s.transactions = make(map[int]transaction)
-
 	fmt.Println("Starting Service")
 
+	s.transactions = make(map[int]transaction)
 	s.cases = []reflect.SelectCase{
 		{
 			Dir:  reflect.SelectRecv,
@@ -185,6 +337,8 @@ func (s *service) run(doneCh chan struct{}, actionCh chan interface{}) {
 			Chan: reflect.ValueOf(nil),
 		},
 	}
+
+	s.findExistingInstances()
 
 DONE:
 	for {
@@ -209,8 +363,22 @@ DONE:
 			s.processAction(value.Interface())
 		case TimeChIndex:
 			break DONE
+		default:
+			/* One of the instanceLoops has quit */
+
+			fmt.Println("Instance loop has died")
+			closeCh := s.cases[index].Chan.Interface().(chan struct{})
+			close(s.instanceChMap[closeCh])
+			delete(s.instances, "instance")
+			delete(s.instanceChMap, closeCh)
+			s.cases = append(s.cases[:index], s.cases[index+1:]...)
 		}
 	}
+
+	for _, instanceCh := range s.instances {
+		close(instanceCh)
+	}
+	s.instanceWg.Wait()
 
 	fmt.Println("Shutting down Service")
 }
@@ -304,7 +472,10 @@ func startServer(signalCh chan os.Signal) error {
 	wg.Add(1)
 	go func() {
 		svc := &service{
-			downloadCh: downloadCh,
+			ccvmDir:       ccvmDir,
+			downloadCh:    downloadCh,
+			instances:     make(map[string]chan instanceCmd),
+			instanceChMap: make(map[chan struct{}]chan instanceCmd),
 		}
 		svc.run(doneCh, api.actionCh)
 		close(finishedCh)
