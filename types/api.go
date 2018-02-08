@@ -34,8 +34,16 @@ type CreateArgs struct {
 // that the creation request has finished and Line containing a lines
 // of output.
 type CreateResult struct {
+	Name     string
 	Finished bool
 	Line     string
+}
+
+// StartArgs contain all the information needed to start a stopped
+// instance.
+type StartArgs struct {
+	Name   string
+	VMSpec VMSpec
 }
 
 // SSHDetails contains SSH connection information for an instance

@@ -98,9 +98,9 @@ func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
 
 // CreateResult blocks until information about the instance creation request has
 // been received.  This information could be an error, signalling that the
-// request has failed, a string containing progress information or an indication
-// that the request has succeeded.  CreateResult should be called continually
-// until res.Finished == true.
+// request has failed or a types.CreateResult.  CreateResult should be called continually
+// until res.Finished == true.  If successful, the final types.CreateResult returned will
+// have the its Finished field set to true and its Name field set to the name of the instance.
 func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 	var err error
 
@@ -120,17 +120,13 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 
 	resultCh := r.(chan interface{})
 	switch v := (<-resultCh).(type) {
-	case string:
-		*res = types.CreateResult{
-			Line: v,
+	case types.CreateResult:
+		*res = v
+		if !res.Finished {
+			return nil
 		}
-		return nil
 	case error:
 		err = v
-	}
-
-	*res = types.CreateResult{
-		Finished: true,
 	}
 
 	s.actionCh <- completeAction(id)
@@ -141,11 +137,11 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 }
 
 // Stop initiates a request to stop an instance.
-func (s *ServerAPI) Stop(args struct{}, id *int) error {
-	fmt.Println("Stop called")
+func (s *ServerAPI) Stop(instanceName string, id *int) error {
+	fmt.Printf("Stop [%s] called\n", instanceName)
 
 	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
-		svc.stop(ctx, resultCh)
+		svc.stop(ctx, instanceName, resultCh)
 	}, id)
 
 	fmt.Printf("Transaction ID %d\n", *id)
@@ -163,11 +159,11 @@ func (s *ServerAPI) StopResult(id int, reply *struct{}) error {
 }
 
 // Start initiates a request to start an instance.
-func (s *ServerAPI) Start(vmSpec *types.VMSpec, id *int) error {
-	fmt.Println("Start called")
+func (s *ServerAPI) Start(args *types.StartArgs, id *int) error {
+	fmt.Printf("Start [%s] called\n", args.Name)
 
 	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
-		svc.start(ctx, resultCh, vmSpec)
+		svc.start(ctx, args.Name, &args.VMSpec, resultCh)
 	}, id)
 
 	fmt.Printf("Transaction ID %d\n", *id)
@@ -185,11 +181,11 @@ func (s *ServerAPI) StartResult(id int, reply *struct{}) error {
 }
 
 // Quit initiates a request to forcefully quit an instance.
-func (s *ServerAPI) Quit(args struct{}, id *int) error {
-	fmt.Println("Quit called")
+func (s *ServerAPI) Quit(instanceName string, id *int) error {
+	fmt.Printf("Quit [%s] called\n", instanceName)
 
 	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
-		svc.quit(ctx, resultCh)
+		svc.quit(ctx, instanceName, resultCh)
 	}, id)
 
 	fmt.Printf("Transaction ID %d\n", *id)
@@ -207,11 +203,11 @@ func (s *ServerAPI) QuitResult(id int, reply *struct{}) error {
 }
 
 // Delete initiates a request to delete an instance.
-func (s *ServerAPI) Delete(args struct{}, id *int) error {
-	fmt.Println("Delete called")
+func (s *ServerAPI) Delete(instanceName string, id *int) error {
+	fmt.Printf("Delete [%s] called\n", instanceName)
 
 	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
-		svc.delete(ctx, resultCh)
+		svc.delete(ctx, instanceName, resultCh)
 	}, id)
 
 	fmt.Printf("Transaction ID %d\n", *id)
@@ -229,11 +225,11 @@ func (s *ServerAPI) DeleteResult(id int, reply *struct{}) error {
 }
 
 // GetInstanceDetails initiates a request to retrieve information about an instance.
-func (s *ServerAPI) GetInstanceDetails(args struct{}, id *int) error {
-	fmt.Println("GetInstanceDetails called")
+func (s *ServerAPI) GetInstanceDetails(instanceName string, id *int) error {
+	fmt.Printf("GetInstanceDetails [%s] called\n", instanceName)
 
 	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
-		svc.status(ctx, resultCh)
+		svc.status(ctx, instanceName, resultCh)
 	}, id)
 
 	fmt.Printf("Transaction ID %d\n", *id)

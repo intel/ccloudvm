@@ -34,8 +34,13 @@ var startCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
+		var instanceName string
+		if len(args) > 0 {
+			instanceName = args[0]
+		}
+
 		mergeVMOptions(&startSpec, &startMOptsSpec)
-		return client.Start(ctx, &startSpec)
+		return client.Start(ctx, instanceName, &startSpec)
 	},
 }
 

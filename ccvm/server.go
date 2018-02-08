@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -89,11 +90,11 @@ type service struct {
 	shuttingDown  bool
 	cases         []reflect.SelectCase
 	instances     map[string]chan instanceCmd
-	instanceChMap map[chan struct{}]chan instanceCmd
+	instanceChMap map[chan struct{}]string
 	instanceWg    sync.WaitGroup
 }
 
-func instanceLoop(instanceCh <-chan instanceCmd, closeCh chan struct{}, wg *sync.WaitGroup) {
+func instanceLoop(name string, instanceCh <-chan instanceCmd, closeCh chan struct{}, wg *sync.WaitGroup) {
 	deleted := false
 	for cmd := range instanceCh {
 		switch cmd.cmdType {
@@ -103,7 +104,14 @@ func instanceLoop(instanceCh <-chan instanceCmd, closeCh chan struct{}, wg *sync
 				continue
 			}
 			err := cmd.fn()
-			cmd.resultCh <- err
+			if err != nil {
+				cmd.resultCh <- err
+			} else {
+				cmd.resultCh <- types.CreateResult{
+					Name:     name,
+					Finished: true,
+				}
+			}
 			if err != nil {
 				deleted = true
 				close(closeCh)
@@ -140,9 +148,9 @@ func (s *service) startInstanceLoop(name string) chan instanceCmd {
 	instanceCh := make(chan instanceCmd)
 	closeCh := make(chan struct{})
 	s.instances[name] = instanceCh
-	s.instanceChMap[closeCh] = instanceCh
+	s.instanceChMap[closeCh] = name
 	s.instanceWg.Add(1)
-	go instanceLoop(instanceCh, closeCh, &s.instanceWg)
+	go instanceLoop(name, instanceCh, closeCh, &s.instanceWg)
 	s.cases = append(s.cases, reflect.SelectCase{
 		Dir:  reflect.SelectRecv,
 		Chan: reflect.ValueOf(closeCh),
@@ -168,15 +176,65 @@ func (s *service) findExistingInstances() {
 	})
 }
 
-func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
-	if _, ok := s.instances["instance"]; ok {
-		resultCh <- errors.New("Instance already exists")
-		return
+func (s *service) getInstance(instanceName string) (string, error) {
+	if instanceName == "" {
+		if len(s.instances) == 0 {
+			return "", errors.New("Instance does not exist")
+		}
+		if len(s.instances) > 1 {
+			return "", errors.New("Please specify an instance name")
+		}
+		for k := range s.instances {
+			return k, nil
+		}
 	}
 
-	args.Name = "instance"
+	if _, ok := s.instances[instanceName]; !ok {
+		return "", errors.New("Instance does not exist")
+	}
 
-	instanceCh := s.startInstanceLoop("instance")
+	return instanceName, nil
+}
+
+func (s *service) newInstanceName() (string, error) {
+	var name string
+	var i int
+
+	for i := 0; i < maxNames(); i++ {
+		name = makeRandomName()
+		if _, ok := s.instances[name]; !ok {
+			break
+		}
+	}
+
+	if i == maxNames() {
+		return "", errors.New("All names are used up")
+	}
+
+	return name, nil
+}
+
+func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
+	if args.Name == "" {
+		instanceName, err := s.newInstanceName()
+		if err != nil {
+			resultCh <- err
+			return
+		}
+		args.Name = instanceName
+	} else {
+		if strings.Contains(args.Name, "/") {
+			resultCh <- errors.New("Instance names may not contain '/' characters")
+			return
+		}
+
+		if _, ok := s.instances[args.Name]; ok {
+			resultCh <- errors.New("Instance already exists")
+			return
+		}
+	}
+
+	instanceCh := s.startInstanceLoop(args.Name)
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdCreate,
 		resultCh: resultCh,
@@ -186,85 +244,90 @@ func (s *service) create(ctx context.Context, resultCh chan interface{}, args *t
 	}
 }
 
-func (s *service) stop(ctx context.Context, resultCh chan interface{}) {
-	instanceCh, ok := s.instances["instance"]
-	if !ok {
-		resultCh <- errors.New("Instance does not exist")
+func (s *service) stop(ctx context.Context, instanceName string, resultCh chan interface{}) {
+	instanceName, err := s.getInstance(instanceName)
+	if err != nil {
+		resultCh <- err
 		return
 	}
+	instanceCh := s.instances[instanceName]
 
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Stop(ctx, "instance")
+			resultCh <- Stop(ctx, instanceName)
 			return nil
 		},
 	}
 }
 
-func (s *service) start(ctx context.Context, resultCh chan interface{}, vmSpec *types.VMSpec) {
-	instanceCh, ok := s.instances["instance"]
-	if !ok {
-		resultCh <- errors.New("Instance does not exist")
+func (s *service) start(ctx context.Context, instanceName string, vmSpec *types.VMSpec, resultCh chan interface{}) {
+	instanceName, err := s.getInstance(instanceName)
+	if err != nil {
+		resultCh <- err
 		return
 	}
+	instanceCh := s.instances[instanceName]
 
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Start(ctx, "instance", vmSpec)
+			resultCh <- Start(ctx, instanceName, vmSpec)
 			return nil
 		},
 	}
 }
 
-func (s *service) quit(ctx context.Context, resultCh chan interface{}) {
-	instanceCh, ok := s.instances["instance"]
-	if !ok {
-		resultCh <- errors.New("Instance does not exist")
+func (s *service) quit(ctx context.Context, instanceName string, resultCh chan interface{}) {
+	instanceName, err := s.getInstance(instanceName)
+	if err != nil {
+		resultCh <- err
 		return
 	}
+	instanceCh := s.instances[instanceName]
 
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Quit(ctx, "instance")
+			resultCh <- Quit(ctx, instanceName)
 			return nil
 		},
 	}
 }
 
-func (s *service) delete(ctx context.Context, resultCh chan interface{}) {
-	instanceCh, ok := s.instances["instance"]
-	if !ok {
-		resultCh <- errors.New("Instance does not exist")
+func (s *service) delete(ctx context.Context, instanceName string, resultCh chan interface{}) {
+	instanceName, err := s.getInstance(instanceName)
+	if err != nil {
+		resultCh <- err
 		return
 	}
+	instanceCh := s.instances[instanceName]
 
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdDelete,
 		resultCh: resultCh,
 		fn: func() error {
-			return Delete(ctx, "instance")
+			return Delete(ctx, instanceName)
 		},
 	}
 }
 
-func (s *service) status(ctx context.Context, resultCh chan interface{}) {
-	instanceCh, ok := s.instances["instance"]
-	if !ok {
-		resultCh <- errors.New("Instance does not exist")
+func (s *service) status(ctx context.Context, instanceName string, resultCh chan interface{}) {
+	instanceName, err := s.getInstance(instanceName)
+	if err != nil {
+		resultCh <- err
 		return
 	}
+	instanceCh := s.instances[instanceName]
 
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			details, err := Status(ctx, "instance")
+			details, err := Status(ctx, instanceName)
 			if err != nil {
 				resultCh <- err
 			} else {
@@ -382,8 +445,9 @@ DONE:
 
 			fmt.Println("Instance loop has died")
 			closeCh := s.cases[index].Chan.Interface().(chan struct{})
-			close(s.instanceChMap[closeCh])
-			delete(s.instances, "instance")
+			name := s.instanceChMap[closeCh]
+			close(s.instances[name])
+			delete(s.instances, name)
 			delete(s.instanceChMap, closeCh)
 			s.cases = append(s.cases[:index], s.cases[index+1:]...)
 		}
@@ -489,7 +553,7 @@ func startServer(signalCh chan os.Signal) error {
 			ccvmDir:       ccvmDir,
 			downloadCh:    downloadCh,
 			instances:     make(map[string]chan instanceCmd),
-			instanceChMap: make(map[chan struct{}]chan instanceCmd),
+			instanceChMap: make(map[chan struct{}]string),
 		}
 		svc.run(doneCh, api.actionCh)
 		close(finishedCh)

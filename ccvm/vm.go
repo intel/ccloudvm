@@ -192,9 +192,13 @@ func startHTTPServer(ctx context.Context, resultCh chan interface{}, downloadCh 
 			return
 		}
 		if line == "OK" || line == "FAIL" {
-			resultCh <- fmt.Sprintf("[%s]\n", line)
+			resultCh <- types.CreateResult{
+				Line: fmt.Sprintf("[%s]\n", line),
+			}
 		} else {
-			resultCh <- fmt.Sprintf("%s : ", line)
+			resultCh <- types.CreateResult{
+				Line: fmt.Sprintf("%s : ", line),
+			}
 		}
 	})
 

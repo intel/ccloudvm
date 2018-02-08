@@ -26,13 +26,13 @@ import (
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run a command in the VM via SSH",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
-		command := strings.Join(args, " ")
-		return client.Run(ctx, command)
+		command := strings.Join(args[1:], " ")
+		return client.Run(ctx, args[0], command)
 	},
 }
 

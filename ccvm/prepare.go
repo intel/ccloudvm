@@ -272,8 +272,12 @@ func buildISOImage(ctx context.Context, resultCh chan interface{}, userData []by
 	}
 
 	if debug {
-		resultCh <- string(userData)
-		resultCh <- string(mdBuf.Bytes())
+		resultCh <- types.CreateResult{
+			Line: string(userData),
+		}
+		resultCh <- types.CreateResult{
+			Line: string(mdBuf.Bytes()),
+		}
 	}
 
 	return createCloudInitISO(ctx, ws.instanceDir, userData, mdBuf.Bytes())

@@ -28,7 +28,12 @@ var statusCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
-		return client.Status(ctx)
+		var instanceName string
+		if len(args) > 0 {
+			instanceName = args[0]
+		}
+
+		return client.Status(ctx, instanceName)
 	},
 }
 

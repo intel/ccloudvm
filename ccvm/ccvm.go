@@ -72,9 +72,13 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 
 func downloadProgress(resultCh chan interface{}, p progress) {
 	if p.totalMB >= 0 {
-		resultCh <- fmt.Sprintf("Downloaded %d MB of %d\n", p.downloadedMB, p.totalMB)
+		resultCh <- types.CreateResult{
+			Line: fmt.Sprintf("Downloaded %d MB of %d\n", p.downloadedMB, p.totalMB),
+		}
 	} else {
-		resultCh <- fmt.Sprintf("Downloaded %d MB\n", p.downloadedMB)
+		resultCh <- types.CreateResult{
+			Line: fmt.Sprintf("Downloaded %d MB\n", p.downloadedMB),
+		}
 	}
 }
 
@@ -118,7 +122,9 @@ func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- do
 		return errors.Wrap(err, "Unable to save instance state")
 	}
 
-	resultCh <- fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName)
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName),
+	}
 
 	qcowPath, err := downloadFile(ctx, downloadCh, transport, wkld.spec.BaseImageURL, func(p progress) {
 		downloadProgress(resultCh, p)
@@ -138,7 +144,9 @@ func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- do
 		return err
 	}
 
-	resultCh <- fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs)
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
+	}
 
 	err = bootVM(ctx, ws, &spec)
 	if err != nil {
@@ -150,8 +158,12 @@ func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- do
 		return err
 	}
 
-	resultCh <- fmt.Sprintf("VM successfully created!\n")
-	resultCh <- fmt.Sprintf("Type ccloudvm connect to start using it.\n")
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("VM successfully created!\n"),
+	}
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Type ccloudvm connect to start using it.\n"),
+	}
 
 	return nil
 }

@@ -86,7 +86,7 @@ then
 	set +e
 	until [ $retry -ge 10 ]
 	do
-	    ccloudvm create --debug --port "8000-80" --package-upgrade=false semaphore
+	    ccloudvm create --name sempahore --debug --port "8000-80" --package-upgrade=false semaphore
 	    if [ $? -eq 0 ]
 	    then
 		set -e
@@ -104,7 +104,7 @@ then
 	    sleep 1
 	done
 else
-    ccloudvm create --debug --port "8000-80" --package-upgrade=false semaphore
+    ccloudvm create --name sempahore --debug --port "8000-80" --package-upgrade=false semaphore
 fi
 
 created=1
@@ -115,7 +115,7 @@ echo ""
 
 # SSH to the instance and execute a command to determine the remote user
 
-lsb_release_cmd="ccloudvm run -- lsb_release -c -s"
+lsb_release_cmd="ccloudvm run sempahore -- lsb_release -c -s"
 remote_distro=`$lsb_release_cmd`
 echo "Check $remote_distro == xenial"
 test $remote_distro = "xenial"

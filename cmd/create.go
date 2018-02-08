@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var instanceName string
 var createSpec types.VMSpec
 var createMOptsSpec multiOptions
 var createDebug bool
@@ -38,7 +39,7 @@ var createCmd = &cobra.Command{
 		defer cancelFunc()
 
 		mergeVMOptions(&createSpec, &createMOptsSpec)
-		return client.Create(ctx, args[0], createDebug, createPackageUpgrade, &createSpec)
+		return client.Create(ctx, instanceName, args[0], createDebug, createPackageUpgrade, &createSpec)
 	},
 }
 
@@ -50,6 +51,7 @@ func init() {
 	flags.IntVar(&createSpec.DiskGiB, "disk", createSpec.DiskGiB, "Gibibytes of disk space allocated to Rootfs")
 
 	createCmd.Flags().AddGoFlagSet(&flags)
+	createCmd.Flags().StringVar(&instanceName, "name", "", "Name of new instance")
 	createCmd.Flags().BoolVar(&createDebug, "debug", false, "Enable debugging mode")
 	createCmd.Flags().BoolVar(&createPackageUpgrade, "package-upgrade", false, "Hint as to whether to upgrade packages on creation")
 }

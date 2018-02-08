@@ -28,7 +28,12 @@ var quitCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
-		return client.Quit(ctx)
+		var instanceName string
+		if len(args) > 0 {
+			instanceName = args[0]
+		}
+
+		return client.Quit(ctx, instanceName)
 	},
 }
 

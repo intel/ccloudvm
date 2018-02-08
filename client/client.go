@@ -234,7 +234,7 @@ func getProxy(upper, lower string) (string, error) {
 }
 
 // Create sets up the VM
-func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) error {
+func Create(ctx context.Context, instanceName, workloadName string, debug bool, update bool, customSpec *types.VMSpec) error {
 	HTTPProxy, err := getProxy("HTTP_PROXY", "http_proxy")
 	if err != nil {
 		return err
@@ -258,6 +258,7 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 			var id int
 			err := client.Call("ServerAPI.Create",
 				types.CreateArgs{
+					Name:         instanceName,
 					WorkloadName: workloadName,
 					Debug:        debug,
 					Update:       update,
@@ -273,8 +274,12 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 			var result types.CreateResult
 			for {
 				err := client.Call("ServerAPI.CreateResult", id, &result)
-				if result.Finished || err != nil {
+				if err != nil {
 					return err
+				}
+				if result.Finished {
+					fmt.Printf("\nInstance %s created\n", result.Name)
+					return nil
 				}
 				fmt.Print(result.Line)
 			}
@@ -282,11 +287,14 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 }
 
 // Start launches the VM
-func Start(ctx context.Context, customSpec *types.VMSpec) error {
+func Start(ctx context.Context, instanceName string, customSpec *types.VMSpec) error {
 	return issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
-			err := client.Call("ServerAPI.Start", *customSpec, &id)
+			err := client.Call("ServerAPI.Start", types.StartArgs{
+				Name:   instanceName,
+				VMSpec: *customSpec,
+			}, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
@@ -296,11 +304,11 @@ func Start(ctx context.Context, customSpec *types.VMSpec) error {
 }
 
 // Stop requests the VM shuts down cleanly
-func Stop(ctx context.Context) error {
+func Stop(ctx context.Context, instanceName string) error {
 	return issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
-			err := client.Call("ServerAPI.Stop", struct{}{}, &id)
+			err := client.Call("ServerAPI.Stop", instanceName, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
@@ -310,11 +318,11 @@ func Stop(ctx context.Context) error {
 }
 
 // Quit forceably kills VM
-func Quit(ctx context.Context) error {
+func Quit(ctx context.Context, instanceName string) error {
 	return issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
-			err := client.Call("ServerAPI.Quit", struct{}{}, &id)
+			err := client.Call("ServerAPI.Quit", instanceName, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
@@ -386,11 +394,11 @@ func waitForSSH(ctx context.Context, in *types.InstanceDetails, silent bool) err
 }
 
 // Status prints out VM information
-func Status(ctx context.Context) error {
+func Status(ctx context.Context, instanceName string) error {
 	return issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
-			err := client.Call("ServerAPI.GetInstanceDetails", struct{}{}, &id)
+			err := client.Call("ServerAPI.GetInstanceDetails", instanceName, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
@@ -406,7 +414,7 @@ func Status(ctx context.Context) error {
 }
 
 // Run connects to the VM via SSH and runs the desired command
-func Run(ctx context.Context, command string) error {
+func Run(ctx context.Context, instanceName, command string) error {
 	path, err := exec.LookPath("ssh")
 	if err != nil {
 		return fmt.Errorf("Unable to locate ssh binary")
@@ -416,7 +424,7 @@ func Run(ctx context.Context, command string) error {
 	err = issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
-			err := client.Call("ServerAPI.GetInstanceDetails", struct{}{}, &id)
+			err := client.Call("ServerAPI.GetInstanceDetails", instanceName, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
@@ -455,16 +463,16 @@ func Run(ctx context.Context, command string) error {
 }
 
 // Connect opens a shell to the VM via
-func Connect(ctx context.Context) error {
-	return Run(ctx, "")
+func Connect(ctx context.Context, instanceName string) error {
+	return Run(ctx, instanceName, "")
 }
 
 // Delete the VM
-func Delete(ctx context.Context) error {
+func Delete(ctx context.Context, instanceName string) error {
 	return issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
-			err := client.Call("ServerAPI.Delete", struct{}{}, &id)
+			err := client.Call("ServerAPI.Delete", instanceName, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
