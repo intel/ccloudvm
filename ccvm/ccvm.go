@@ -82,8 +82,7 @@ func downloadProgress(resultCh chan interface{}, p progress) {
 	}
 }
 
-// Create sets up the VM
-func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
+func createInstance(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
 	var err error
 
 	wkld, ws, transport, err := prepareCreate(ctx, args)
@@ -168,8 +167,7 @@ func Create(ctx context.Context, resultCh chan interface{}, downloadCh chan<- do
 	return nil
 }
 
-// Start launches the VM
-func Start(ctx context.Context, name string, customSpec *types.VMSpec) error {
+func start(ctx context.Context, name string, customSpec *types.VMSpec) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
@@ -214,8 +212,7 @@ func Start(ctx context.Context, name string, customSpec *types.VMSpec) error {
 	return nil
 }
 
-// Stop requests the VM shuts down cleanly
-func Stop(ctx context.Context, name string) error {
+func stop(ctx context.Context, name string) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
@@ -231,8 +228,7 @@ func Stop(ctx context.Context, name string) error {
 	return nil
 }
 
-// Quit forceably kills VM
-func Quit(ctx context.Context, name string) error {
+func quit(ctx context.Context, name string) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
@@ -248,8 +244,7 @@ func Quit(ctx context.Context, name string) error {
 	return nil
 }
 
-// Status prints out VM information
-func Status(ctx context.Context, name string) (*types.InstanceDetails, error) {
+func status(ctx context.Context, name string) (*types.InstanceDetails, error) {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return nil, err
@@ -276,8 +271,7 @@ func Status(ctx context.Context, name string) (*types.InstanceDetails, error) {
 	}, nil
 }
 
-// Delete the VM
-func Delete(ctx context.Context, name string) error {
+func deleteInstance(ctx context.Context, name string) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err

@@ -265,7 +265,7 @@ func (s *service) create(ctx context.Context, resultCh chan interface{}, args *t
 		cmdType:  instanceCmdCreate,
 		resultCh: resultCh,
 		fn: func() error {
-			return Create(ctx, resultCh, s.downloadCh, args)
+			return createInstance(ctx, resultCh, s.downloadCh, args)
 		},
 	}
 }
@@ -282,7 +282,7 @@ func (s *service) stop(ctx context.Context, instanceName string, resultCh chan i
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Stop(ctx, instanceName)
+			resultCh <- stop(ctx, instanceName)
 			return nil
 		},
 	}
@@ -300,7 +300,7 @@ func (s *service) start(ctx context.Context, instanceName string, vmSpec *types.
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Start(ctx, instanceName, vmSpec)
+			resultCh <- start(ctx, instanceName, vmSpec)
 			return nil
 		},
 	}
@@ -318,7 +318,7 @@ func (s *service) quit(ctx context.Context, instanceName string, resultCh chan i
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- Quit(ctx, instanceName)
+			resultCh <- quit(ctx, instanceName)
 			return nil
 		},
 	}
@@ -336,7 +336,7 @@ func (s *service) delete(ctx context.Context, instanceName string, resultCh chan
 		cmdType:  instanceCmdDelete,
 		resultCh: resultCh,
 		fn: func() error {
-			return Delete(ctx, instanceName)
+			return deleteInstance(ctx, instanceName)
 		},
 	}
 }
@@ -353,7 +353,7 @@ func (s *service) status(ctx context.Context, instanceName string, resultCh chan
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			details, err := Status(ctx, instanceName)
+			details, err := status(ctx, instanceName)
 			if err != nil {
 				resultCh <- err
 			} else {
