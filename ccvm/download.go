@@ -357,8 +357,14 @@ DONE:
 				continue
 			}
 			df, ok := d.files[name]
+			imgPath := filepath.Join(d.cacheDir, name)
 			if ok {
-				if df.p.complete {
+				if !df.p.complete {
+					df.listeners = append(df.listeners, r)
+					continue
+				}
+
+				if _, err := os.Stat(imgPath); err == nil {
 					fmt.Printf("Download of %s finished\n", name)
 					r.progress <- downloadUpdate{
 						p:    df.p,
@@ -366,13 +372,10 @@ DONE:
 						path: df.path,
 					}
 					close(r.progress)
-				} else {
-					df.listeners = append(df.listeners, r)
+					continue
 				}
-				continue
 			}
 			ctx, cancel := context.WithCancel(context.Background())
-			imgPath := filepath.Join(d.cacheDir, name)
 			d.files[name] = &downloadedFile{
 				listeners: []downloadRequest{
 					r,
