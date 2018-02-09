@@ -167,11 +167,6 @@ func TestRestoreWorkload(t *testing.T) {
 			t.Errorf("Names do not match expected %s got %s",
 				guestImageFriendlyName, workload.spec.BaseImageName)
 		}
-		if defaultHostname != workload.spec.Hostname {
-			t.Errorf("Hostnames do not match expected %s got %s",
-				defaultHostname, workload.spec.Hostname)
-		}
-
 	}
 }
 
@@ -244,7 +239,6 @@ func level0spec() workloadSpec {
 		NeedsNestedVM: true,
 		VM:            defaultVMSpec(),
 		WorkloadName:  "level0",
-		Hostname:      "singlevm",
 	}
 
 	spec.ensureSSHPortMapping()

@@ -213,10 +213,6 @@ func (wkld *workload) merge(parent *workload) {
 		wkld.spec.BaseImageName = parent.spec.BaseImageName
 	}
 
-	if wkld.spec.Hostname == "" {
-		wkld.spec.Hostname = parent.spec.Hostname
-	}
-
 	// Always better to require nested VM that not.
 	if !wkld.spec.NeedsNestedVM {
 		wkld.spec.NeedsNestedVM = parent.spec.NeedsNestedVM

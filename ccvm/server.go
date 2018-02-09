@@ -27,7 +27,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
-	"strings"
+	"regexp"
 	"sync"
 	"syscall"
 	"time"
@@ -45,9 +45,11 @@ const (
 )
 
 var systemd bool
+var hostnameRegexp *regexp.Regexp
 
 func init() {
 	flag.BoolVar(&systemd, "systemd", true, "Use systemd socket activation if true")
+	hostnameRegexp = regexp.MustCompile("^[A-Za-z0-9\\-]+$")
 }
 
 type startAction struct {
@@ -249,8 +251,8 @@ func (s *service) create(ctx context.Context, resultCh chan interface{}, args *t
 		}
 		args.Name = instanceName
 	} else {
-		if strings.Contains(args.Name, "/") {
-			resultCh <- errors.New("Instance names may not contain '/' characters")
+		if !hostnameRegexp.MatchString(args.Name) {
+			resultCh <- errors.Errorf("Invalid hostname %s", args.Name)
 			return
 		}
 

@@ -51,7 +51,7 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 	}
 
 	ws.Mounts = in.Mounts
-	ws.Hostname = wkld.spec.Hostname
+	ws.Hostname = args.Name
 	if ws.NoProxy != "" {
 		ws.NoProxy = fmt.Sprintf("%s,%s,10.0.2.2", ws.Hostname, ws.NoProxy)
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {

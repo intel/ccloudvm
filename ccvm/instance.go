@@ -35,13 +35,11 @@ const defaultRootFSSize = 60
 const (
 	guestDownloadURL       = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
 	guestImageFriendlyName = "Ubuntu 16.04"
-	defaultHostname        = "singlevm"
 )
 
 type workloadSpec struct {
 	BaseImageURL  string       `yaml:"base_image_url"`
 	BaseImageName string       `yaml:"base_image_name"`
-	Hostname      string       `yaml:"hostname"`
 	WorkloadName  string       `yaml:"workload"`
 	NeedsNestedVM bool         `yaml:"needs_nested_vm"`
 	VM            types.VMSpec `yaml:"vm"`
@@ -63,7 +61,6 @@ func defaultWorkload() *workload {
 		spec: workloadSpec{
 			BaseImageName: guestImageFriendlyName,
 			BaseImageURL:  guestDownloadURL,
-			Hostname:      defaultHostname,
 			VM:            defaultVMSpec(),
 		},
 	}

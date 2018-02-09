@@ -125,5 +125,5 @@ func makeRandomName() string {
 		nameGenerator.counter = 0
 	}
 	nameGenerator.Unlock()
-	return fmt.Sprintf("%s_%s", randomAdjectives[ni.a], randomNames[ni.n])
+	return fmt.Sprintf("%s-%s", randomAdjectives[ni.a], randomNames[ni.n])
 }
