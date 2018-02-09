@@ -94,49 +94,75 @@ type service struct {
 	instanceWg    sync.WaitGroup
 }
 
+func returnCreateResult(createCmd instanceCmd, name string, err error) {
+	if err != nil {
+		createCmd.resultCh <- err
+	} else {
+		createCmd.resultCh <- types.CreateResult{
+			Name:     name,
+			Finished: true,
+		}
+	}
+}
+
 func instanceLoop(name string, instanceCh <-chan instanceCmd, closeCh chan struct{}, wg *sync.WaitGroup) {
+	var createCh chan error
+	var createCmd instanceCmd
+
 	deleted := false
-	for cmd := range instanceCh {
-		switch cmd.cmdType {
-		case instanceCmdCreate:
-			if deleted {
-				cmd.resultCh <- errors.New("Instance already exists (but is being deleted)")
-				continue
+
+DONE:
+	for {
+		select {
+		case cmd, ok := <-instanceCh:
+			if !ok {
+				break DONE
 			}
-			err := cmd.fn()
-			if err != nil {
-				cmd.resultCh <- err
-			} else {
-				cmd.resultCh <- types.CreateResult{
-					Name:     name,
-					Finished: true,
+			switch cmd.cmdType {
+			case instanceCmdCreate:
+				if deleted {
+					cmd.resultCh <- errors.New("Instance already exists (but is being deleted)")
+					continue
+				}
+				createCh = make(chan error)
+				createCmd = cmd
+				go func() {
+					createCh <- cmd.fn()
+				}()
+			default:
+				if deleted {
+					cmd.resultCh <- errors.New("Instance does not exist")
+					continue
+				}
+				if createCh != nil {
+					cmd.resultCh <- errors.New("Command not allowed while instance is being created")
+					continue
+				}
+				if cmd.cmdType == instanceCmdDelete {
+					err := cmd.fn()
+					cmd.resultCh <- err
+					if err == nil {
+						deleted = true
+						close(closeCh)
+					}
+				} else {
+					/* Instance loop is only interested in errors from create and delete */
+					_ = cmd.fn()
 				}
 			}
+		case err := <-createCh:
+			createCh = nil
+			returnCreateResult(createCmd, name, err)
 			if err != nil {
 				deleted = true
 				close(closeCh)
 			}
-		case instanceCmdDelete:
-			if deleted {
-				cmd.resultCh <- errors.New("Instance does not exist")
-				continue
-			}
-			err := cmd.fn()
-			cmd.resultCh <- err
-			if err == nil {
-				deleted = true
-				close(closeCh)
-			}
-		case instanceCmdOther:
-			if deleted {
-				cmd.resultCh <- errors.New("Instance does not exist")
-				continue
-			}
-
-			/* Instance loop is only interested in errors from create and delete */
-
-			_ = cmd.fn()
 		}
+	}
+
+	if createCh != nil {
+		err := <-createCh
+		returnCreateResult(createCmd, name, err)
 	}
 
 	fmt.Println("Instance loop quiting")
