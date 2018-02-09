@@ -184,12 +184,12 @@ func start(ctx context.Context, name string, customSpec *types.VMSpec) error {
 		return err
 	}
 
-	memMiB, CPUs := getMemAndCpus()
+	defaults := defaultVMSpec()
 	if in.MemMiB == 0 {
-		in.MemMiB = memMiB
+		in.MemMiB = defaults.MemMiB
 	}
 	if in.CPUs == 0 {
-		in.CPUs = CPUs
+		in.CPUs = defaults.CPUs
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {

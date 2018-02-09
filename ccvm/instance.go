@@ -49,7 +49,7 @@ type workloadSpec struct {
 }
 
 func defaultVMSpec() types.VMSpec {
-	memDef, cpuDef := getMemAndCpus()
+	memDef, cpuDef := 1000, 1
 
 	return types.VMSpec{
 		MemMiB:  memDef,
