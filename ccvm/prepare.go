@@ -121,7 +121,7 @@ func prepareSSHKeys(ctx context.Context, ws *workspace) error {
 func prepareEnv(ctx context.Context, name string) (*workspace, error) {
 	var err error
 
-	ws := &workspace{HTTPServerPort: 8080}
+	ws := &workspace{}
 	data, err := exec.Command("go", "env", "GOPATH").Output()
 	if err == nil {
 		ws.GoPath = filepath.Clean(strings.TrimSpace(string(data)))

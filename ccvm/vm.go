@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -219,13 +220,36 @@ func startHTTPServer(ctx context.Context, resultCh chan interface{}, downloadCh 
 	}()
 }
 
+func createLocalListener() (net.Listener, int, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "Unable to create listener")
+	}
+
+	_, portStr, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		_ = listener.Close()
+		return nil, 0, errors.Wrap(err, "Unable to parse address of local HTTP server")
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		_ = listener.Close()
+		return nil, 0, errors.Wrap(err, "Unable to determine port number of local HTTP server")
+	}
+
+	return listener, port, nil
+}
+
 func manageInstallation(ctx context.Context, resultCh chan interface{},
-	downloadCh chan<- downloadRequest, transport *http.Transport, instanceDir string, ws *workspace) error {
+	downloadCh chan<- downloadRequest, transport *http.Transport, listener net.Listener,
+	instanceDir string) error {
 	socket := path.Join(instanceDir, "socket")
 	disconnectedCh := make(chan struct{})
 
 	qmp, _, err := qemu.QMPStart(ctx, socket, qemu.QMPConfig{}, disconnectedCh)
 	if err != nil {
+		_ = listener.Close()
 		return errors.Wrap(err, "Unable to connect to VM")
 	}
 
@@ -242,12 +266,8 @@ func manageInstallation(ctx context.Context, resultCh chan interface{},
 
 	err = qmp.ExecuteQMPCapabilities(ctx)
 	if err != nil {
+		_ = listener.Close()
 		return fmt.Errorf("Unable to query QEMU caps")
-	}
-
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ws.HTTPServerPort))
-	if err != nil {
-		return errors.Wrap(err, "Unable to create listener")
 	}
 
 	errCh := make(chan error)

@@ -111,6 +111,17 @@ func createInstance(ctx context.Context, resultCh chan interface{}, downloadCh c
 		return err
 	}
 
+	listener, port, err := createLocalListener()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if listener != nil {
+			_ = listener.Close()
+		}
+	}()
+	ws.HTTPServerPort = port
+
 	err = wkld.generateCloudConfig(ws)
 	if err != nil {
 		return errors.Wrap(err, "Error applying template to user-data")
@@ -152,7 +163,10 @@ func createInstance(ctx context.Context, resultCh chan interface{}, downloadCh c
 		return err
 	}
 
-	err = manageInstallation(ctx, resultCh, downloadCh, transport, ws.instanceDir, ws)
+	err = manageInstallation(ctx, resultCh, downloadCh, transport, listener, ws.instanceDir)
+
+	// Ownership of listener passes to manageInstallation
+	listener = nil
 	if err != nil {
 		return err
 	}
