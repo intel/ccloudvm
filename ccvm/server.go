@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -364,6 +365,17 @@ func (s *service) status(ctx context.Context, instanceName string, resultCh chan
 			return nil
 		},
 	}
+}
+
+func (s *service) getInstances(ctx context.Context, resultCh chan interface{}) {
+	names := make([]string, len(s.instances))
+	i := 0
+	for k := range s.instances {
+		names[i] = k
+		i++
+	}
+	sort.Strings(names)
+	resultCh <- names
 }
 
 func (s *service) processAction(action interface{}) {

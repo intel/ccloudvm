@@ -176,9 +176,10 @@ created=0
 
 # Check it's really gone
 
-if test -d ~/.ccloudvm/instance
+instance_list=`ccloudvm instances`
+if [ "$instance_list" != "" ]
 then
-    echo "~/.ccloudvm/instance still exists"
+    echo "instance still exists"
     false
 fi
 

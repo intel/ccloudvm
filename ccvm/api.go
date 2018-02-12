@@ -239,7 +239,7 @@ func (s *ServerAPI) GetInstanceDetails(instanceName string, id *int) error {
 // GetInstanceDetailsResult blocks until the instance's details have been received or
 // an error occurs.
 func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetails) error {
-	fmt.Printf("GetInstanceDetails(%d) called\n", id)
+	fmt.Printf("GetInstanceDetailsResult(%d) called\n", id)
 
 	result := getResult{
 		ID:  id,
@@ -265,6 +265,50 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 	s.actionCh <- completeAction(id)
 
 	fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, err)
+
+	return err
+}
+
+// GetInstances initiates a request to retrieve the names of the existing instances.
+func (s *ServerAPI) GetInstances(arg struct{}, id *int) error {
+	fmt.Println("GetInstances called")
+
+	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+		svc.getInstances(ctx, resultCh)
+	}, id)
+
+	fmt.Printf("Transaction ID %d\n", *id)
+	return nil
+}
+
+// GetInstancesResult blocks until the names of all the instances have been received.
+func (s *ServerAPI) GetInstancesResult(id int, reply *[]string) error {
+	fmt.Printf("GetInstancesResult(%d) called\n", id)
+
+	result := getResult{
+		ID:  id,
+		res: make(chan interface{}),
+	}
+
+	s.actionCh <- result
+	r := <-result.res
+	if v, ok := r.(error); ok {
+		fmt.Printf("GetInstancesResult(%d) finished: %v\n", id, v)
+		return v
+	}
+
+	var err error
+
+	resultCh := r.(chan interface{})
+	switch res := (<-resultCh).(type) {
+	case error:
+		err = res
+	case []string:
+		*reply = res
+	}
+	s.actionCh <- completeAction(id)
+
+	fmt.Printf("GetInstancesResult(%d) finished: %v\n", id, err)
 
 	return err
 }

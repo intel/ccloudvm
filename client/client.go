@@ -345,12 +345,16 @@ func sshReady(ctx context.Context, sshPort int) bool {
 	return retval
 }
 
+func sshConnectionString(details *types.InstanceDetails) string {
+	return fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", details.SSH.KeyPath, details.SSH.Port)
+}
+
 func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	status := "VM down"
 	ssh := "N/A"
 	if sshReady(ctx, details.SSH.Port) {
 		status = "VM up"
-		ssh = fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", details.SSH.KeyPath, details.SSH.Port)
+		ssh = sshConnectionString(details)
 	}
 
 	w := new(tabwriter.Writer)
@@ -479,4 +483,56 @@ func Delete(ctx context.Context, instanceName string) error {
 			var result struct{}
 			return client.Call("ServerAPI.DeleteResult", id, &result)
 		})
+}
+
+// Instances provides information about all of the current instances
+func Instances(ctx context.Context) error {
+	var instances []string
+	err := issueCommand(ctx,
+		func(client *rpc.Client) (int, error) {
+			var id int
+			err := client.Call("ServerAPI.GetInstances", struct{}{}, &id)
+			return id, err
+		},
+		func(client *rpc.Client, id int) error {
+			return client.Call("ServerAPI.GetInstancesResult", id, &instances)
+		})
+
+	if err != nil {
+		return err
+	}
+
+	instanceDetails := make([]types.InstanceDetails, 0, len(instances))
+	for _, name := range instances {
+		_ = issueCommand(ctx,
+			func(client *rpc.Client) (int, error) {
+				var id int
+				err := client.Call("ServerAPI.GetInstanceDetails", name, &id)
+				return id, err
+			},
+			func(client *rpc.Client, id int) error {
+				var details types.InstanceDetails
+				err := client.Call("ServerAPI.GetInstanceDetailsResult", id, &details)
+				if err != nil {
+					return err
+				}
+				instanceDetails = append(instanceDetails, details)
+				return nil
+			})
+	}
+
+	if len(instanceDetails) == 0 {
+		return nil
+	}
+
+	w := new(tabwriter.Writer)
+	w.Init(os.Stdout, 0, 8, 1, '\t', 0)
+	fmt.Fprintln(w, "Name\tWorkload\t")
+	for _, id := range instanceDetails {
+		fmt.Fprintf(w, "%s\t%s\n", id.Name, id.Workload)
+	}
+	_ = w.Flush()
+
+	return nil
+
 }
