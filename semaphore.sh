@@ -187,7 +187,7 @@ fi
 if [ "$SEMAPHORE_REPO_SLUG" = "intel/ccloudvm" ]
 then
     go get github.com/mattn/goveralls
-    $GOPATH/bin/goveralls -v -service=semaphore --package github.com/intel/ccloudvm/ccvm
+    $GOPATH/bin/goveralls --race -v -service=semaphore --package github.com/intel/ccloudvm/ccvm
 else
-    go test -v github.com/intel/ccloudvm/ccvm
+    go test --race -v github.com/intel/ccloudvm/ccvm
 fi

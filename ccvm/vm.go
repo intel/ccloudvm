@@ -188,8 +188,8 @@ func startHTTPServer(ctx context.Context, resultCh chan interface{}, downloadCh 
 		}
 		line := string(b.Bytes())
 		if line == "FINISHED" {
-			_ = listener.Close()
 			finished = true
+			_ = listener.Close()
 			return
 		}
 		if line == "OK" || line == "FAIL" {
