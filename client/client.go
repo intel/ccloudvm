@@ -345,21 +345,22 @@ func sshReady(ctx context.Context, sshPort int) bool {
 	return retval
 }
 
-func statusVM(ctx context.Context, keyPath, workloadName string, sshPort int, qemuport uint) {
+func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	status := "VM down"
 	ssh := "N/A"
-	if sshReady(ctx, sshPort) {
+	if sshReady(ctx, details.SSH.Port) {
 		status = "VM up"
-		ssh = fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", keyPath, sshPort)
+		ssh = fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", details.SSH.KeyPath, details.SSH.Port)
 	}
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-	fmt.Fprintf(w, "Workload\t:\t%s\n", workloadName)
+	fmt.Fprintf(w, "Name\t:\t%s\n", details.Name)
+	fmt.Fprintf(w, "Workload\t:\t%s\n", details.Workload)
 	fmt.Fprintf(w, "Status\t:\t%s\n", status)
 	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
-	if qemuport != 0 {
-		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", qemuport)
+	if details.DebugPort != 0 {
+		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", details.DebugPort)
 	}
 	_ = w.Flush()
 }
@@ -407,8 +408,7 @@ func Status(ctx context.Context, instanceName string) error {
 			if err != nil {
 				return err
 			}
-			statusVM(ctx, result.SSH.KeyPath, result.Workload, result.SSH.Port,
-				result.DebugPort)
+			statusVM(ctx, &result)
 			return nil
 		})
 }

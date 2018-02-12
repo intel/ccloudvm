@@ -54,6 +54,7 @@ type SSHDetails struct {
 
 // InstanceDetails contains information about an instance
 type InstanceDetails struct {
+	Name      string
 	SSH       SSHDetails
 	Workload  string
 	DebugPort uint

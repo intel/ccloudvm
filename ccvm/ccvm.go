@@ -276,6 +276,7 @@ func status(ctx context.Context, name string) (*types.InstanceDetails, error) {
 	}
 
 	return &types.InstanceDetails{
+		Name: name,
 		SSH: types.SSHDetails{
 			KeyPath: ws.keyPath,
 			Port:    sshPort,
