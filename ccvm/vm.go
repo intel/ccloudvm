@@ -86,10 +86,10 @@ func bootVM(ctx context.Context, ws *workspace, in *types.VMSpec) error {
 	if len(in.PortMappings) > 0 {
 		i := 0
 		p := in.PortMappings[i]
-		b.WriteString(fmt.Sprintf("user,hostfwd=tcp::%d-:%d", p.Host, p.Guest))
+		b.WriteString(fmt.Sprintf("user,hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
 		for i = i + 1; i < len(in.PortMappings); i++ {
 			p := in.PortMappings[i]
-			b.WriteString(fmt.Sprintf(",hostfwd=tcp::%d-:%d", p.Host, p.Guest))
+			b.WriteString(fmt.Sprintf(",hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
 		}
 	}
 

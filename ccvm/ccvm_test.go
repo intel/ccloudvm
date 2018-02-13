@@ -56,10 +56,10 @@ func setupDownloadDir(t *testing.T) (string, string) {
 	return tmpDir, downDir
 }
 
-func waitForSSH(ctx context.Context, sshPort int) error {
+func waitForSSH(ctx context.Context, address net.IP, sshPort int) error {
 	for {
 		dialer := net.Dialer{}
-		conn, err := dialer.DialContext(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", sshPort))
+		conn, err := dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", address, sshPort))
 		if err == nil {
 			_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
 			scanner := bufio.NewScanner(conn)
@@ -174,6 +174,7 @@ func TestSystem(t *testing.T) {
 				Guest: 22,
 			},
 		},
+		HostIP: net.IPv4(127, 1, 1, 1),
 	}
 
 	name := makeRandomName() + "-test"
@@ -236,7 +237,7 @@ func TestSystem(t *testing.T) {
 		t.Errorf("Unable to determine SSH port of instance: %v", err)
 	}
 
-	err = waitForSSH(ctx, port)
+	err = waitForSSH(ctx, vmSpec.HostIP, port)
 	if err != nil {
 		t.Errorf("Instance is not available via SSH: %v", err)
 	}

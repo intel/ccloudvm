@@ -16,6 +16,8 @@
 
 package types
 
+import "net"
+
 // CreateArgs contains all the information necessary to create a new
 // ccloudvm instance.
 type CreateArgs struct {
@@ -56,6 +58,7 @@ type SSHDetails struct {
 // InstanceDetails contains information about an instance
 type InstanceDetails struct {
 	Name      string
+	HostIP    net.IP
 	SSH       SSHDetails
 	Workload  string
 	DebugPort uint

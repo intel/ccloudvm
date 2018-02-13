@@ -92,6 +92,7 @@ type service struct {
 	transactions  map[int]transaction
 	shuttingDown  bool
 	cases         []reflect.SelectCase
+	hostIPs       map[uint32]struct{}
 	instances     map[string]chan instanceCmd
 	instanceChMap map[chan struct{}]string
 	instanceWg    sync.WaitGroup
@@ -173,11 +174,21 @@ DONE:
 	wg.Done()
 }
 
-func (s *service) startInstanceLoop(name string) chan instanceCmd {
+func flattenIP(ip net.IP) (uint32, error) {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return 0, errors.Errorf("%s is not a valid IP4 address", ip)
+	}
+
+	return uint32(ip4[0])<<24 | uint32(ip4[1])<<16 | uint32(ip4[2])<<8 | uint32(ip4[3]), nil
+}
+
+func (s *service) startInstanceLoop(name string, flatIP uint32) chan instanceCmd {
 	instanceCh := make(chan instanceCmd)
 	closeCh := make(chan struct{})
 	s.instances[name] = instanceCh
 	s.instanceChMap[closeCh] = name
+	s.hostIPs[flatIP] = struct{}{}
 	s.instanceWg.Add(1)
 	go instanceLoop(name, instanceCh, closeCh, &s.instanceWg)
 	s.cases = append(s.cases, reflect.SelectCase{
@@ -185,6 +196,27 @@ func (s *service) startInstanceLoop(name string) chan instanceCmd {
 		Chan: reflect.ValueOf(closeCh),
 	})
 	return instanceCh
+}
+
+func (s *service) findFreeIP() (net.IP, uint32, error) {
+	i := 0x7f000001
+	maxIPs := 0x7ffffffe
+	for ; i < maxIPs; i++ {
+		if _, ok := s.hostIPs[uint32(i)]; !ok {
+			break
+		}
+	}
+
+	if i == maxIPs {
+		return net.IP{}, 0, errors.New("No IP addresses left")
+	}
+
+	a := byte((0xff000000 & i) >> 24)
+	b := byte((0xff0000 & i) >> 16)
+	c := byte((0xff00 & i) >> 8)
+	d := byte(0xff & i)
+
+	return net.IPv4(a, b, c, d), uint32(i), nil
 }
 
 func (s *service) findExistingInstances() {
@@ -199,7 +231,21 @@ func (s *service) findExistingInstances() {
 			return nil
 		}
 
-		_ = s.startInstanceLoop(info.Name())
+		details, err := status(context.Background(), info.Name())
+		if err != nil {
+			fmt.Printf("Unable to read state information for %s\n", info.Name())
+			return filepath.SkipDir
+		}
+
+		flatIP, err := flattenIP(details.HostIP)
+		if err != nil {
+			fmt.Printf("Unable to parse IP address %s\n", details.HostIP)
+			return filepath.SkipDir
+		}
+
+		fmt.Printf("Starting instance %s on %s\n", info.Name(), details.HostIP)
+
+		_ = s.startInstanceLoop(info.Name(), flatIP)
 
 		return filepath.SkipDir
 	})
@@ -263,7 +309,29 @@ func (s *service) create(ctx context.Context, resultCh chan interface{}, args *t
 		}
 	}
 
-	instanceCh := s.startInstanceLoop(args.Name)
+	var flatIP uint32
+	if len(args.CustomSpec.HostIP) == 0 {
+		hostIP, i, err := s.findFreeIP()
+		if err != nil {
+			resultCh <- err
+			return
+		}
+		args.CustomSpec.HostIP = hostIP
+		flatIP = i
+	} else {
+		flatIP, err := flattenIP(args.CustomSpec.HostIP)
+		if err != nil {
+			resultCh <- err
+			return
+		}
+		_, ok := s.hostIPs[flatIP]
+		if ok {
+			resultCh <- errors.Errorf("IP address %s is already in use", args.CustomSpec.HostIP)
+			return
+		}
+	}
+
+	instanceCh := s.startInstanceLoop(args.Name, flatIP)
 	instanceCh <- instanceCmd{
 		cmdType:  instanceCmdCreate,
 		resultCh: resultCh,
@@ -594,6 +662,7 @@ func startServer(signalCh chan os.Signal) error {
 			downloadCh:    downloadCh,
 			instances:     make(map[string]chan instanceCmd),
 			instanceChMap: make(map[chan struct{}]string),
+			hostIPs:       make(map[uint32]struct{}),
 		}
 		svc.run(doneCh, api.actionCh)
 		close(finishedCh)

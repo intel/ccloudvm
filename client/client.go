@@ -344,10 +344,10 @@ func Quit(ctx context.Context, instanceName string) error {
 		})
 }
 
-func sshReady(ctx context.Context, sshPort int) bool {
+func sshReady(ctx context.Context, hostIP net.IP, sshPort int) bool {
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "tcp",
-		fmt.Sprintf("127.0.0.1:%d", sshPort))
+		fmt.Sprintf("%s:%d", hostIP, sshPort))
 	if err != nil {
 		return false
 	}
@@ -359,13 +359,14 @@ func sshReady(ctx context.Context, sshPort int) bool {
 }
 
 func sshConnectionString(details *types.InstanceDetails) string {
-	return fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", details.SSH.KeyPath, details.SSH.Port)
+	return fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s %s -p %d",
+		details.SSH.KeyPath, details.HostIP, details.SSH.Port)
 }
 
 func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	status := "VM down"
 	ssh := "N/A"
-	if sshReady(ctx, details.SSH.Port) {
+	if sshReady(ctx, details.HostIP, details.SSH.Port) {
 		status = "VM up"
 		ssh = sshConnectionString(details)
 	}
@@ -373,6 +374,7 @@ func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
 	fmt.Fprintf(w, "Name\t:\t%s\n", details.Name)
+	fmt.Fprintf(w, "HostIP\t:\t%s\n", details.HostIP)
 	fmt.Fprintf(w, "Workload\t:\t%s\n", details.Workload)
 	fmt.Fprintf(w, "Status\t:\t%s\n", status)
 	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
@@ -383,7 +385,7 @@ func statusVM(ctx context.Context, details *types.InstanceDetails) {
 }
 
 func waitForSSH(ctx context.Context, in *types.InstanceDetails, silent bool) error {
-	if !sshReady(ctx, in.SSH.Port) {
+	if !sshReady(ctx, in.HostIP, in.SSH.Port) {
 		if !silent {
 			fmt.Printf("Waiting for VM to boot ")
 		}
@@ -395,7 +397,7 @@ func waitForSSH(ctx context.Context, in *types.InstanceDetails, silent bool) err
 				return fmt.Errorf("Cancelled")
 			}
 
-			if sshReady(ctx, in.SSH.Port) {
+			if sshReady(ctx, in.HostIP, in.SSH.Port) {
 				break DONE
 			}
 
@@ -468,7 +470,7 @@ func Run(ctx context.Context, instanceName, command string) error {
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "IdentitiesOnly=yes",
 		"-i", result.SSH.KeyPath,
-		"127.0.0.1", "-p", strconv.Itoa(result.SSH.Port),
+		result.HostIP.String(), "-p", strconv.Itoa(result.SSH.Port),
 	}
 
 	if command != "" {
@@ -540,9 +542,9 @@ func Instances(ctx context.Context) error {
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 1, '\t', 0)
-	fmt.Fprintln(w, "Name\tWorkload\t")
+	fmt.Fprintln(w, "Name\tHostIP\tWorkload\t")
 	for _, id := range instanceDetails {
-		fmt.Fprintf(w, "%s\t%s\n", id.Name, id.Workload)
+		fmt.Fprintf(w, "%s\t%s\t%s\t\n", id.Name, id.HostIP, id.Workload)
 	}
 	_ = w.Flush()
 

@@ -18,17 +18,43 @@ package cmd
 
 import (
 	"flag"
+	"net"
 
 	"github.com/intel/ccloudvm/client"
 	"github.com/intel/ccloudvm/types"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
+
+type ipAddr net.IP
+
+func (ip *ipAddr) String() string {
+	return (*net.IP)(ip).String()
+}
+
+func (ip *ipAddr) Type() string {
+	return "string"
+}
+
+func (ip *ipAddr) Set(value string) error {
+	addr := net.ParseIP(value)
+	if len(addr) == 0 {
+		return errors.Errorf("Invalid IP address [%s] specified", value)
+	}
+	addr = addr.To4()
+	if len(addr) == 0 {
+		return errors.Errorf("[%s] is not an IP4V address", value)
+	}
+	*ip = ipAddr(addr)
+	return nil
+}
 
 var instanceName string
 var createSpec types.VMSpec
 var createMOptsSpec multiOptions
 var createDebug bool
 var createPackageUpgrade bool
+var createHostIP ipAddr
 
 var createCmd = &cobra.Command{
 	Use:   "create",
@@ -39,6 +65,7 @@ var createCmd = &cobra.Command{
 		defer cancelFunc()
 
 		mergeVMOptions(&createSpec, &createMOptsSpec)
+		createSpec.HostIP = net.IP(createHostIP)
 		return client.Create(ctx, instanceName, args[0], createDebug, createPackageUpgrade, &createSpec)
 	},
 }
@@ -54,4 +81,5 @@ func init() {
 	createCmd.Flags().StringVar(&instanceName, "name", "", "Name of new instance")
 	createCmd.Flags().BoolVar(&createDebug, "debug", false, "Enable debugging mode")
 	createCmd.Flags().BoolVar(&createPackageUpgrade, "package-upgrade", false, "Hint as to whether to upgrade packages on creation")
+	createCmd.Flags().Var(&createHostIP, "hostip", "Host IP address on which instance services will be exposed")
 }
