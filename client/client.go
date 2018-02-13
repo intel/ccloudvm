@@ -80,6 +80,14 @@ ListenStream=%s/.ccloudvm/socket
 WantedBy=sockets.target
 `
 
+func getGoPath() (string, error) {
+	goPathBytes, err := exec.Command("go", "env", "GOPATH").Output()
+	if err != nil {
+		return "", errors.Wrap(err, "Unable to determine GOPATH")
+	}
+	return strings.TrimSpace(string(goPathBytes)), nil
+}
+
 // Setup Installs dependencies
 func Setup(ctx context.Context) error {
 	home := os.Getenv("HOME")
@@ -88,11 +96,10 @@ func Setup(ctx context.Context) error {
 	}
 	home = strings.TrimSpace(home)
 
-	goPathBytes, err := exec.Command("go", "env", "GOPATH").Output()
+	goPath, err := getGoPath()
 	if err != nil {
-		return errors.Wrap(err, "Unable to determine GOPATH")
+		return err
 	}
-	goPath := strings.TrimSpace(string(goPathBytes))
 
 	fmt.Println("Installing host dependencies")
 	osprepare.InstallDeps(ctx, ccloudvmDeps, logger{})
@@ -253,6 +260,11 @@ func Create(ctx context.Context, instanceName, workloadName string, debug bool, 
 
 	noProxy := os.Getenv("no_proxy")
 
+	goPath, err := getGoPath()
+	if err != nil {
+		return err
+	}
+
 	return issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
@@ -266,6 +278,7 @@ func Create(ctx context.Context, instanceName, workloadName string, debug bool, 
 					HTTPProxy:    HTTPProxy,
 					HTTPSProxy:   HTTPSProxy,
 					NoProxy:      noProxy,
+					GoPath:       goPath,
 				},
 				&id)
 			return id, err

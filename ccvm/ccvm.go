@@ -35,6 +35,7 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 	ws.HTTPProxy = args.HTTPProxy
 	ws.HTTPSProxy = args.HTTPSProxy
 	ws.NoProxy = args.NoProxy
+	ws.GoPath = args.GoPath
 
 	transport := getHTTPTransport(ws.HTTPProxy, ws.HTTPSProxy, ws.NoProxy)
 

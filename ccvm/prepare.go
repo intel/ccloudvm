@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -122,10 +121,6 @@ func prepareEnv(ctx context.Context, name string) (*workspace, error) {
 	var err error
 
 	ws := &workspace{}
-	data, err := exec.Command("go", "env", "GOPATH").Output()
-	if err == nil {
-		ws.GoPath = filepath.Clean(strings.TrimSpace(string(data)))
-	}
 	ws.Home = os.Getenv("HOME")
 	if ws.Home == "" {
 		return nil, fmt.Errorf("HOME is not defined")
@@ -143,7 +138,7 @@ func prepareEnv(ctx context.Context, name string) (*workspace, error) {
 	ws.keyPath = path.Join(ws.ccvmDir, "id_rsa")
 	ws.publicKeyPath = fmt.Sprintf("%s.pub", ws.keyPath)
 
-	data, err = exec.Command("git", "config", "--global", "user.name").Output()
+	data, err := exec.Command("git", "config", "--global", "user.name").Output()
 	if err == nil {
 		ws.GitUserName = strings.TrimSpace(string(data))
 	}
