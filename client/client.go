@@ -360,13 +360,13 @@ func sshReady(ctx context.Context, hostIP net.IP, sshPort int) bool {
 
 func sshConnectionString(details *types.InstanceDetails) string {
 	return fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s %s -p %d",
-		details.SSH.KeyPath, details.HostIP, details.SSH.Port)
+		details.SSH.KeyPath, details.VMSpec.HostIP, details.SSH.Port)
 }
 
 func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	status := "VM down"
 	ssh := "N/A"
-	if sshReady(ctx, details.HostIP, details.SSH.Port) {
+	if sshReady(ctx, details.VMSpec.HostIP, details.SSH.Port) {
 		status = "VM up"
 		ssh = sshConnectionString(details)
 	}
@@ -374,18 +374,21 @@ func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
 	fmt.Fprintf(w, "Name\t:\t%s\n", details.Name)
-	fmt.Fprintf(w, "HostIP\t:\t%s\n", details.HostIP)
+	fmt.Fprintf(w, "HostIP\t:\t%s\n", details.VMSpec.HostIP)
 	fmt.Fprintf(w, "Workload\t:\t%s\n", details.Workload)
 	fmt.Fprintf(w, "Status\t:\t%s\n", status)
 	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
-	if details.DebugPort != 0 {
-		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", details.DebugPort)
+	fmt.Fprintf(w, "VCPUs\t:\t%d\n", details.VMSpec.CPUs)
+	fmt.Fprintf(w, "Mem\t:\t%d MiB\n", details.VMSpec.MemMiB)
+	fmt.Fprintf(w, "Disk\t:\t%d Gib\n", details.VMSpec.DiskGiB)
+	if details.VMSpec.Qemuport != 0 {
+		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", details.VMSpec.Qemuport)
 	}
 	_ = w.Flush()
 }
 
 func waitForSSH(ctx context.Context, in *types.InstanceDetails, silent bool) error {
-	if !sshReady(ctx, in.HostIP, in.SSH.Port) {
+	if !sshReady(ctx, in.VMSpec.HostIP, in.SSH.Port) {
 		if !silent {
 			fmt.Printf("Waiting for VM to boot ")
 		}
@@ -397,7 +400,7 @@ func waitForSSH(ctx context.Context, in *types.InstanceDetails, silent bool) err
 				return fmt.Errorf("Cancelled")
 			}
 
-			if sshReady(ctx, in.HostIP, in.SSH.Port) {
+			if sshReady(ctx, in.VMSpec.HostIP, in.SSH.Port) {
 				break DONE
 			}
 
@@ -470,7 +473,7 @@ func Run(ctx context.Context, instanceName, command string) error {
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "IdentitiesOnly=yes",
 		"-i", result.SSH.KeyPath,
-		result.HostIP.String(), "-p", strconv.Itoa(result.SSH.Port),
+		result.VMSpec.HostIP.String(), "-p", strconv.Itoa(result.SSH.Port),
 	}
 
 	if command != "" {
@@ -542,9 +545,11 @@ func Instances(ctx context.Context) error {
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 1, '\t', 0)
-	fmt.Fprintln(w, "Name\tHostIP\tWorkload\t")
+	fmt.Fprintln(w, "Name\tHostIP\tWorkload\tVCPUs\tMem\tDisk\t")
 	for _, id := range instanceDetails {
-		fmt.Fprintf(w, "%s\t%s\t%s\t\n", id.Name, id.HostIP, id.Workload)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d MiB\t%d Gib\n",
+			id.Name, id.VMSpec.HostIP, id.Workload,
+			id.VMSpec.CPUs, id.VMSpec.MemMiB, id.VMSpec.DiskGiB)
 	}
 	_ = w.Flush()
 

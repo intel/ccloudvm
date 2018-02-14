@@ -277,14 +277,13 @@ func status(ctx context.Context, name string) (*types.InstanceDetails, error) {
 	}
 
 	return &types.InstanceDetails{
-		Name:   name,
-		HostIP: in.HostIP,
+		Name: name,
 		SSH: types.SSHDetails{
 			KeyPath: ws.keyPath,
 			Port:    sshPort,
 		},
-		Workload:  wkld.spec.WorkloadName,
-		DebugPort: in.Qemuport,
+		Workload: wkld.spec.WorkloadName,
+		VMSpec:   *in,
 	}, nil
 }
 

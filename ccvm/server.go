@@ -237,13 +237,13 @@ func (s *service) findExistingInstances() {
 			return filepath.SkipDir
 		}
 
-		flatIP, err := flattenIP(details.HostIP)
+		flatIP, err := flattenIP(details.VMSpec.HostIP)
 		if err != nil {
-			fmt.Printf("Unable to parse IP address %s\n", details.HostIP)
+			fmt.Printf("Unable to parse IP address %s\n", details.VMSpec.HostIP)
 			return filepath.SkipDir
 		}
 
-		fmt.Printf("Starting instance %s on %s\n", info.Name(), details.HostIP)
+		fmt.Printf("Starting instance %s on %s\n", info.Name(), details.VMSpec.HostIP)
 
 		_ = s.startInstanceLoop(info.Name(), flatIP)
 
