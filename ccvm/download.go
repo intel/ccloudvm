@@ -134,7 +134,7 @@ func makeFileName(URL string) (string, error) {
 }
 
 func getFile(ctx context.Context, name, URL string, transport *http.Transport,
-	dest io.WriteCloser, progressCh chan updateInfo) (err error) {
+	dest io.WriteCloser, progressCh chan updateInfo) (size int, err error) {
 	defer func() {
 		err1 := dest.Close()
 		if err == nil && err1 != nil {
@@ -174,23 +174,15 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 
 	buf := make([]byte, 1<<20)
 	_, err = io.CopyBuffer(dest, pr, buf)
-
 	if err == nil {
-		progressCh <- updateInfo{
-			p: progress{
-				downloadedMB: pr.totalMB,
-				totalMB:      pr.totalMB,
-				complete:     true,
-			},
-			name: name,
-		}
+		size = pr.totalMB
 	}
 
 	return
 }
 
 func prepareDownload(ctx context.Context, imgPath, name, URL string,
-	transport *http.Transport, progressCh chan updateInfo) error {
+	transport *http.Transport, progressCh chan updateInfo) (int, error) {
 	tmpImgPath := imgPath + ".part"
 
 	if _, err := os.Stat(tmpImgPath); err == nil {
@@ -199,35 +191,36 @@ func prepareDownload(ctx context.Context, imgPath, name, URL string,
 
 	f, err := os.Create(tmpImgPath)
 	if err != nil {
-		return errors.Wrap(err, "Unable to create download file")
+		return 0, errors.Wrap(err, "Unable to create download file")
 	}
 
-	err = getFile(ctx, name, URL, transport, f, progressCh)
+	size, err := getFile(ctx, name, URL, transport, f, progressCh)
 	if err != nil {
 		_ = os.Remove(tmpImgPath)
-		return errors.Wrapf(err, "Unable download file %s", URL)
+		return 0, errors.Wrapf(err, "Unable download file %s", URL)
 	}
 
 	err = os.Rename(tmpImgPath, imgPath)
 	if err != nil {
 		_ = os.Remove(tmpImgPath)
-		return errors.Wrapf(err, "Unable move downloaded file to %s: %v", imgPath)
+		return 0, errors.Wrapf(err, "Unable move downloaded file to %s", imgPath)
 	}
 
-	return nil
+	return size, nil
 }
 
 func initiateDownload(ctx context.Context, progressCh chan updateInfo, imgPath, name, URL string,
 	transport *http.Transport, wg *sync.WaitGroup) {
 	fmt.Printf("First download of %s\n", URL)
-	if err := prepareDownload(ctx, imgPath, name, URL, transport, progressCh); err != nil {
-		progressCh <- updateInfo{
-			err: err,
-			p: progress{
-				complete: true,
-			},
-			name: name,
-		}
+	size, err := prepareDownload(ctx, imgPath, name, URL, transport, progressCh)
+	progressCh <- updateInfo{
+		err: err,
+		p: progress{
+			downloadedMB: size,
+			totalMB:      size,
+			complete:     true,
+		},
+		name: name,
 	}
 	wg.Done()
 }
