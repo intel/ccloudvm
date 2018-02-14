@@ -141,6 +141,52 @@ func Setup(ctx context.Context) error {
 	return nil
 }
 
+// Teardown disables the ccloudvm service and deletes all existing instances
+func Teardown(ctx context.Context) error {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return errors.New("HOME is not defined")
+	}
+
+	var instances []string
+	err := issueCommand(ctx,
+		func(client *rpc.Client) (int, error) {
+			var id int
+			err := client.Call("ServerAPI.GetInstances", struct{}{}, &id)
+			return id, err
+		},
+		func(client *rpc.Client, id int) error {
+			return client.Call("ServerAPI.GetInstancesResult", id, &instances)
+		})
+	if err == nil {
+		for _, i := range instances {
+			fmt.Printf("Deleting %s\n", i)
+			_ = Delete(ctx, i)
+		}
+	}
+
+	/* There's a tiny chance of a race here.  If someone started creating
+	   a VM in one window and called teardown in another and the instance came into
+	   existence after we called GetInstances but before we shut down the service,
+	   there's a small chance the instance could be leaked. */
+
+	fmt.Println("Removing ccloudvm service")
+
+	_ = exec.Command("systemctl", "--user", "disable", "ccloudvm.service").Run()
+	_ = exec.Command("systemctl", "--user", "disable", "ccloudvm.socket").Run()
+	_ = exec.Command("systemctl", "--user", "stop", "ccloudvm.service").Run()
+	_ = exec.Command("systemctl", "--user", "stop", "ccloudvm.socket").Run()
+
+	systemdRootPath := filepath.Join(home, ".local/share/systemd/user")
+
+	servicePath := filepath.Join(systemdRootPath, "ccloudvm.service")
+	_ = os.Remove(servicePath)
+
+	socketPath := filepath.Join(systemdRootPath, "ccloudvm.socket")
+	_ = os.Remove(socketPath)
+	return nil
+}
+
 func dialHTTP(ctx context.Context, socketPath string) (client *rpc.Client, err error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
