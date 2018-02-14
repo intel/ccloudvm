@@ -283,6 +283,7 @@ func (wkld *workload) parse(ws *workspace) (cloudConfig, error) {
 		"endTaskCheck": endTaskCheckFN,
 		"endTaskOk":    endTaskOkFN,
 		"endTaskFail":  endTaskFailFN,
+		"message":      messageFN,
 	}
 
 	udt, err := template.New("user-data").Funcs(funcMap).Parse(wkld.userData)

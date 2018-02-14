@@ -41,6 +41,7 @@ const metaDataTemplate = `
   "hostname": "{{.Hostname}}"
 }
 `
+const msgprefix = "MESSAGE:"
 
 type workspace struct {
 	GoPath         string
@@ -213,6 +214,12 @@ func endTaskOkFN(ws *workspace) string {
 func endTaskFailFN(ws *workspace) string {
 	const failStr = `curl -X PUT -d "FAIL" 10.0.2.2:%d`
 	return fmt.Sprintf(failStr, ws.HTTPServerPort)
+}
+
+func messageFN(ws *workspace, message string) string {
+	const msgStr = `'curl -X PUT -d "%s%s" 10.0.2.2:%d'`
+	message = strings.Replace(message, "'", "''", -1)
+	return fmt.Sprintf(msgStr, msgprefix, message, ws.HTTPServerPort)
 }
 
 func proxyVarsFN(ws *workspace) string {
