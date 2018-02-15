@@ -176,12 +176,13 @@ func (in *VMSpec) MergeCustom(customSpec *VMSpec) error {
 		in.Qemuport = customSpec.Qemuport
 	}
 
-	/* We don't allow host ips to be specified in the workload definition */
+	if len(customSpec.HostIP) > 0 {
+		in.HostIP = customSpec.HostIP
+	}
 
-	if len(customSpec.HostIP) == 0 {
+	if len(in.HostIP) == 0 {
 		return errors.New("HostIP not defined")
 	}
-	in.HostIP = customSpec.HostIP
 
 	in.MergeMounts(customSpec.Mounts)
 	in.MergePorts(customSpec.PortMappings)
