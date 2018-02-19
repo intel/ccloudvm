@@ -100,7 +100,7 @@ func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
 // been received.  This information could be an error, signalling that the
 // request has failed or a types.CreateResult.  CreateResult should be called continually
 // until res.Finished == true.  If successful, the final types.CreateResult returned will
-// have the its Finished field set to true and its Name field set to the name of the instance.
+// have its Finished field set to true and its Name field set to the name of the instance.
 func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 	var err error
 
