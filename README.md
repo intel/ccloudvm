@@ -6,9 +6,16 @@
 
 ## Introduction
 
-ccloudvm is a small utility that simplifies the task of creating,
-managing and connecting to virtual machines.  All you need to have
-installed on your machine is:
+Configurable Cloud VM (ccloudvm) is a command line tool for creating and
+managing Virtual Machine (VM) based development environments.  ccloudvm creates
+these development environments from the cloud images of Linux distributions.
+These images have a number of interesting properties.  They are small, quick to
+download, quick to start and are configurable using a tool,
+[cloud-init](https://cloudinit.readthedocs.io/en/latest/), widely adopted in the
+cloud.  ccloudvm builds VM based development environments from either
+pre-shipped or user supplied annotated cloud-init files.
+
+All you need to have installed on your machine is:
 
 - Go 1.8 or greater
 
