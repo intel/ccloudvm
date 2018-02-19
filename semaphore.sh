@@ -8,7 +8,7 @@ function finish {
 
     if [ $created -eq 1 ]
     then
-	ccloudvm delete
+	ccloudvm delete semaphore
     fi
 
     echo ""
@@ -126,7 +126,7 @@ echo ""
 # Get port mapping is working by send a http GET to the nginx server running in
 # the VM
 
-instance_ip=$(ccloudvm status | sed '2q;d' | cut -d ":" -f 2 | xargs)
+instance_ip=$(ccloudvm status semaphore | sed '2q;d' | cut -d ":" -f 2 | xargs)
 
 http_proxy= curl http://$instance_ip:8000
 
@@ -136,7 +136,7 @@ echo ""
 echo "===== Testing ccloudvm stop ====="
 echo ""
 
-ccloudvm stop
+ccloudvm stop semaphore
 
 # Check there are no qemu processes running.  A bit racy I know.  It would
 # be better if stop waited until the qemu process had actually exited.
@@ -171,14 +171,17 @@ echo ""
 echo "===== Testing ccloudvm delete ====="
 echo ""
 
-ccloudvm delete
+ccloudvm delete semaphore
 
 created=0
 
 # Check it's really gone
 
-instance_list=`ccloudvm instances`
-if [ "$instance_list" != "" ]
+set +e
+ccloudvm status semaphore 2> /dev/null
+error_code=$?
+set -e
+if [[ $error_code -eq 0 ]]
 then
     echo "instance still exists"
     false
