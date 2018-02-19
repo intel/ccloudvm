@@ -60,7 +60,7 @@ var randomNames = []string{
 	"galahad",
 	"gareth",
 	"gawain",
-	"glatistant",
+	"glatisant",
 	"guinevere",
 	"hector",
 	"igraine",
