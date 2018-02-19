@@ -175,9 +175,6 @@ func createInstance(ctx context.Context, resultCh chan interface{}, downloadCh c
 	resultCh <- types.CreateResult{
 		Line: fmt.Sprintf("VM successfully created!\n"),
 	}
-	resultCh <- types.CreateResult{
-		Line: fmt.Sprintf("Type ccloudvm connect to start using it.\n"),
-	}
 
 	return nil
 }

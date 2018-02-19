@@ -341,6 +341,7 @@ func Create(ctx context.Context, instanceName, workloadName string, debug bool, 
 				}
 				if result.Finished {
 					fmt.Printf("\nInstance %s created\n", result.Name)
+					fmt.Printf("Type 'ccloudvm connect %s' to start using it.\n", result.Name)
 					return nil
 				}
 				fmt.Print(result.Line)
