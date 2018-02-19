@@ -94,6 +94,7 @@ type service struct {
 	cases         []reflect.SelectCase
 	hostIPs       map[uint32]struct{}
 	instances     map[string]chan instanceCmd
+	hostIPMask    uint32
 	instanceChMap map[chan struct{}]string
 	instanceWg    sync.WaitGroup
 }
@@ -199,8 +200,8 @@ func (s *service) startInstanceLoop(name string, flatIP uint32) chan instanceCmd
 }
 
 func (s *service) findFreeIP() (net.IP, uint32, error) {
-	i := 0x7f000001
-	maxIPs := 0x7ffffffe
+	i := s.hostIPMask + 1
+	maxIPs := i + 254
 	for ; i < maxIPs; i++ {
 		if _, ok := s.hostIPs[uint32(i)]; !ok {
 			break
@@ -663,6 +664,7 @@ func startServer(signalCh chan os.Signal) error {
 			instances:     make(map[string]chan instanceCmd),
 			instanceChMap: make(map[chan struct{}]string),
 			hostIPs:       make(map[uint32]struct{}),
+			hostIPMask:    0x7f000000 | uint32((os.Getuid()&0xffff)<<8),
 		}
 		svc.run(doneCh, api.actionCh)
 		close(finishedCh)
