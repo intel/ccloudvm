@@ -22,9 +22,23 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ciao-project/ciao/deviceinfo"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
+
+func checkMemAvailable(in *types.VMSpec) error {
+	_, available := deviceinfo.GetMemoryInfo()
+	if available == -1 {
+		return fmt.Errorf("Unable to compute memory statistics of host device")
+	}
+
+	if in.MemMiB > available {
+		return fmt.Errorf("Host device has only %d MiB of RAM available", available)
+	}
+
+	return nil
+}
 
 func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *workspace, *http.Transport, error) {
 	ws, err := prepareEnv(ctx, args.Name)
@@ -66,6 +80,10 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
 		return nil, nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
+	}
+
+	if err := checkMemAvailable(in); err != nil {
+		return nil, nil, nil, err
 	}
 
 	return wkld, ws, transport, nil
@@ -206,6 +224,10 @@ func start(ctx context.Context, name string, customSpec *types.VMSpec) error {
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
 		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
+	}
+
+	if err := checkMemAvailable(in); err != nil {
+		return err
 	}
 
 	if err := wkld.save(ws); err != nil {
