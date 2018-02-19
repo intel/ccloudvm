@@ -336,10 +336,6 @@ if it fails.
 Reporting a failure back to ccloudvm does not cause the create command to exit.  The
 failure is presented to the user and the setup of the VM continues.
 
-```
-
-is usually the last command in the runcmd section.  Remember it's currently mandatory.
-
 ### Automatically mounting shared folders
 
 As previously mentioned mounts specified in the instance data document will only
