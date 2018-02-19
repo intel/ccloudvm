@@ -529,7 +529,7 @@ Status	:	VM up
 SSH	:	ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i /home/markus/.ccloudvm/id_rsa 127.3.232.1 -p 10022
 VCPUs	:	2
 Mem	:	2048 MiB
-Disk	:	10 Gib
+Disk	:	10 GiB
 ```
 
 ### stop \[instance-name\]

@@ -430,7 +430,7 @@ func statusVM(ctx context.Context, details *types.InstanceDetails) {
 	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
 	fmt.Fprintf(w, "VCPUs\t:\t%d\n", details.VMSpec.CPUs)
 	fmt.Fprintf(w, "Mem\t:\t%d MiB\n", details.VMSpec.MemMiB)
-	fmt.Fprintf(w, "Disk\t:\t%d Gib\n", details.VMSpec.DiskGiB)
+	fmt.Fprintf(w, "Disk\t:\t%d GiB\n", details.VMSpec.DiskGiB)
 	if details.VMSpec.Qemuport != 0 {
 		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", details.VMSpec.Qemuport)
 	}
