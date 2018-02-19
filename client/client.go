@@ -304,7 +304,10 @@ func Create(ctx context.Context, instanceName, workloadName string, debug bool, 
 		HTTPSProxy = u.String()
 	}
 
-	noProxy := os.Getenv("no_proxy")
+	noProxy := os.Getenv("NO_PROXY")
+	if noProxy == "" {
+		noProxy = os.Getenv("no_proxy")
+	}
 
 	goPath, err := getGoPath()
 	if err != nil {
