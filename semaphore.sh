@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 set -e
@@ -78,33 +77,33 @@ echo ""
 if [[ ! -z "${SEMAPHORE_REPO_SLUG}" ]]
 then
     # There's a race condition here when running on semaphore as we don't
-    # when when the ccvm server is up and running.  As we can't fork in Go we
+    # when the ccvm server is up and running.  As we can't fork in Go we
     # can't easily create a proper daemon.  It's doable but lots of work
     # and as this is only a test feature we'll just retry a few times.
-	retry=0
+    retry=0
 
-	set +e
-	until [ $retry -ge 10 ]
-	do
-	    ccloudvm create --name sempahore --debug --port "8000-80" --package-upgrade=false semaphore
-	    if [ $? -eq 0 ]
-	    then
-		set -e
-		break
-	    fi
+    set +e
+    until [ $retry -ge 10 ]
+    do
+	ccloudvm create --name semaphore --debug --port "8000-80" --package-upgrade=false semaphore
+	if [ $? -eq 0 ]
+	then
+	    set -e
+	    break
+	fi
 
-	    echo "Retrying create instance"
+	echo "Retrying create instance"
 
-	    let retry=retry+1
+	let retry=retry+1
 
-	    if [ $retry -eq 9 ]
-	    then
-		set -e
-	     fi
-	    sleep 1
-	done
+	if [ $retry -eq 9 ]
+	then
+	    set -e
+	fi
+	sleep 1
+    done
 else
-    ccloudvm create --name sempahore --debug --port "8000-80" --package-upgrade=false semaphore
+    ccloudvm create --name semaphore --debug --port "8000-80" --package-upgrade=false semaphore
 fi
 
 created=1
@@ -115,7 +114,7 @@ echo ""
 
 # SSH to the instance and execute a command to determine the remote user
 
-lsb_release_cmd="ccloudvm run sempahore -- lsb_release -c -s"
+lsb_release_cmd="ccloudvm run semaphore -- lsb_release -c -s"
 remote_distro=`$lsb_release_cmd`
 echo "Check $remote_distro == xenial"
 test $remote_distro = "xenial"
@@ -127,7 +126,9 @@ echo ""
 # Get port mapping is working by send a http GET to the nginx server running in
 # the VM
 
-http_proxy= curl http://localhost:8000
+instance_ip=$(ccloudvm status | sed '2q;d' | cut -d ":" -f 2 | xargs)
+
+http_proxy= curl http://$instance_ip:8000
 
 # Stop the VM
 
