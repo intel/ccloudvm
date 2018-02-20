@@ -53,8 +53,18 @@ func init() {
 	hostnameRegexp = regexp.MustCompile("^[A-Za-z0-9\\-]+$")
 }
 
+type service interface {
+	create(context.Context, chan interface{}, *types.CreateArgs)
+	stop(context.Context, string, chan interface{})
+	start(context.Context, string, *types.VMSpec, chan interface{})
+	quit(context.Context, string, chan interface{})
+	delete(context.Context, string, chan interface{})
+	status(context.Context, string, chan interface{})
+	getInstances(context.Context, chan interface{})
+}
+
 type startAction struct {
-	action  func(ctx context.Context, s *service, resultCh chan interface{})
+	action  func(ctx context.Context, s service, resultCh chan interface{})
 	transCh chan int
 }
 
@@ -84,7 +94,7 @@ type instanceCmd struct {
 	fn       func() error
 }
 
-type service struct {
+type ccvmService struct {
 	ccvmDir       string
 	downloadCh    chan<- downloadRequest
 	counter       int
@@ -184,7 +194,7 @@ func flattenIP(ip net.IP) (uint32, error) {
 	return uint32(ip4[0])<<24 | uint32(ip4[1])<<16 | uint32(ip4[2])<<8 | uint32(ip4[3]), nil
 }
 
-func (s *service) startInstanceLoop(name string, flatIP uint32) chan instanceCmd {
+func (s *ccvmService) startInstanceLoop(name string, flatIP uint32) chan instanceCmd {
 	instanceCh := make(chan instanceCmd)
 	closeCh := make(chan struct{})
 	s.instances[name] = instanceCh
@@ -199,7 +209,7 @@ func (s *service) startInstanceLoop(name string, flatIP uint32) chan instanceCmd
 	return instanceCh
 }
 
-func (s *service) findFreeIP() (net.IP, uint32, error) {
+func (s *ccvmService) findFreeIP() (net.IP, uint32, error) {
 	i := s.hostIPMask + 1
 	maxIPs := i + 254
 	for ; i < maxIPs; i++ {
@@ -220,7 +230,7 @@ func (s *service) findFreeIP() (net.IP, uint32, error) {
 	return net.IPv4(a, b, c, d), uint32(i), nil
 }
 
-func (s *service) findExistingInstances() {
+func (s *ccvmService) findExistingInstances() {
 	instancesDir := filepath.Join(s.ccvmDir, "instances")
 
 	_ = filepath.Walk(instancesDir, func(path string, info os.FileInfo, err error) error {
@@ -252,7 +262,7 @@ func (s *service) findExistingInstances() {
 	})
 }
 
-func (s *service) getInstance(instanceName string) (string, error) {
+func (s *ccvmService) getInstance(instanceName string) (string, error) {
 	if instanceName == "" {
 		if len(s.instances) == 0 {
 			return "", errors.New("Instance does not exist")
@@ -272,7 +282,7 @@ func (s *service) getInstance(instanceName string) (string, error) {
 	return instanceName, nil
 }
 
-func (s *service) newInstanceName() (string, error) {
+func (s *ccvmService) newInstanceName() (string, error) {
 	var name string
 	var i int
 
@@ -290,7 +300,7 @@ func (s *service) newInstanceName() (string, error) {
 	return name, nil
 }
 
-func (s *service) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
+func (s *ccvmService) create(ctx context.Context, resultCh chan interface{}, args *types.CreateArgs) {
 	if args.Name == "" {
 		instanceName, err := s.newInstanceName()
 		if err != nil {
@@ -342,7 +352,7 @@ func (s *service) create(ctx context.Context, resultCh chan interface{}, args *t
 	}
 }
 
-func (s *service) stop(ctx context.Context, instanceName string, resultCh chan interface{}) {
+func (s *ccvmService) stop(ctx context.Context, instanceName string, resultCh chan interface{}) {
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
@@ -360,7 +370,7 @@ func (s *service) stop(ctx context.Context, instanceName string, resultCh chan i
 	}
 }
 
-func (s *service) start(ctx context.Context, instanceName string, vmSpec *types.VMSpec, resultCh chan interface{}) {
+func (s *ccvmService) start(ctx context.Context, instanceName string, vmSpec *types.VMSpec, resultCh chan interface{}) {
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
@@ -378,7 +388,7 @@ func (s *service) start(ctx context.Context, instanceName string, vmSpec *types.
 	}
 }
 
-func (s *service) quit(ctx context.Context, instanceName string, resultCh chan interface{}) {
+func (s *ccvmService) quit(ctx context.Context, instanceName string, resultCh chan interface{}) {
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
@@ -396,7 +406,7 @@ func (s *service) quit(ctx context.Context, instanceName string, resultCh chan i
 	}
 }
 
-func (s *service) delete(ctx context.Context, instanceName string, resultCh chan interface{}) {
+func (s *ccvmService) delete(ctx context.Context, instanceName string, resultCh chan interface{}) {
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
@@ -413,7 +423,7 @@ func (s *service) delete(ctx context.Context, instanceName string, resultCh chan
 	}
 }
 
-func (s *service) status(ctx context.Context, instanceName string, resultCh chan interface{}) {
+func (s *ccvmService) status(ctx context.Context, instanceName string, resultCh chan interface{}) {
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
@@ -436,7 +446,7 @@ func (s *service) status(ctx context.Context, instanceName string, resultCh chan
 	}
 }
 
-func (s *service) getInstances(ctx context.Context, resultCh chan interface{}) {
+func (s *ccvmService) getInstances(ctx context.Context, resultCh chan interface{}) {
 	names := make([]string, len(s.instances))
 	i := 0
 	for k := range s.instances {
@@ -447,7 +457,7 @@ func (s *service) getInstances(ctx context.Context, resultCh chan interface{}) {
 	resultCh <- names
 }
 
-func (s *service) processAction(action interface{}) {
+func (s *ccvmService) processAction(action interface{}) {
 	switch a := action.(type) {
 	case startAction:
 		/*
@@ -505,7 +515,7 @@ func (s *service) processAction(action interface{}) {
 	}
 }
 
-func (s *service) run(doneCh chan struct{}, actionCh chan interface{}) {
+func (s *ccvmService) run(doneCh chan struct{}, actionCh chan interface{}) {
 	fmt.Println("Starting Service")
 
 	s.transactions = make(map[int]transaction)
@@ -658,7 +668,7 @@ func startServer(signalCh chan os.Signal) error {
 
 	wg.Add(1)
 	go func() {
-		svc := &service{
+		svc := &ccvmService{
 			ccvmDir:       ccvmDir,
 			downloadCh:    downloadCh,
 			instances:     make(map[string]chan instanceCmd),

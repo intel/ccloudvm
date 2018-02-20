@@ -43,7 +43,7 @@ type ServerAPI struct {
 	actionCh chan interface{}
 }
 
-func (s *ServerAPI) sendStartAction(fn func(context.Context, *service, chan interface{}), id *int) {
+func (s *ServerAPI) sendStartAction(fn func(context.Context, service, chan interface{}), id *int) {
 	action := startAction{
 		action:  fn,
 		transCh: make(chan int),
@@ -88,7 +88,7 @@ func (s *ServerAPI) Cancel(arg int, reply *struct{}) error {
 func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
 	fmt.Printf("Create %+v called\n", *args)
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.create(ctx, resultCh, args)
 	}, id)
 
@@ -140,7 +140,7 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 func (s *ServerAPI) Stop(instanceName string, id *int) error {
 	fmt.Printf("Stop [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.stop(ctx, instanceName, resultCh)
 	}, id)
 
@@ -162,7 +162,7 @@ func (s *ServerAPI) StopResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Start(args *types.StartArgs, id *int) error {
 	fmt.Printf("Start [%s] called\n", args.Name)
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.start(ctx, args.Name, &args.VMSpec, resultCh)
 	}, id)
 
@@ -184,7 +184,7 @@ func (s *ServerAPI) StartResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Quit(instanceName string, id *int) error {
 	fmt.Printf("Quit [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.quit(ctx, instanceName, resultCh)
 	}, id)
 
@@ -206,7 +206,7 @@ func (s *ServerAPI) QuitResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Delete(instanceName string, id *int) error {
 	fmt.Printf("Delete [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.delete(ctx, instanceName, resultCh)
 	}, id)
 
@@ -228,7 +228,7 @@ func (s *ServerAPI) DeleteResult(id int, reply *struct{}) error {
 func (s *ServerAPI) GetInstanceDetails(instanceName string, id *int) error {
 	fmt.Printf("GetInstanceDetails [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.status(ctx, instanceName, resultCh)
 	}, id)
 
@@ -273,7 +273,7 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 func (s *ServerAPI) GetInstances(arg struct{}, id *int) error {
 	fmt.Println("GetInstances called")
 
-	s.sendStartAction(func(ctx context.Context, svc *service, resultCh chan interface{}) {
+	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.getInstances(ctx, resultCh)
 	}, id)
 
