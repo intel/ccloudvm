@@ -141,6 +141,7 @@ func createDownloader() (*downloader, error) {
 }
 
 func TestSystem(t *testing.T) {
+	b := ccvmBackend{}
 	ctx, cancelFunc := context.WithTimeout(context.Background(), standardTimeout)
 	defer func() {
 		cancelFunc()
@@ -209,7 +210,7 @@ func TestSystem(t *testing.T) {
 		wg.Done()
 	}()
 
-	err = createInstance(ctx, resultCh, downloadCh, createArgs)
+	err = b.createInstance(ctx, resultCh, downloadCh, createArgs)
 	close(resultCh)
 	if err != nil {
 		t.Fatalf("Unable to create VM: %v", err)
@@ -217,17 +218,17 @@ func TestSystem(t *testing.T) {
 	close(doneCh)
 	wg.Wait()
 
-	err = start(ctx, name, vmSpec)
+	err = b.start(ctx, name, vmSpec)
 	if err == nil || err == context.DeadlineExceeded {
 		t.Errorf("Start expected to fail")
 	}
 
-	err = stop(ctx, name)
+	err = b.stop(ctx, name)
 	if err != nil {
 		t.Errorf("Failed to Stop instance: %v", err)
 	}
 
-	err = start(ctx, name, vmSpec)
+	err = b.start(ctx, name, vmSpec)
 	if err != nil {
 		t.Errorf("Failed to Restart instance: %v", err)
 	}
@@ -242,12 +243,12 @@ func TestSystem(t *testing.T) {
 		t.Errorf("Instance is not available via SSH: %v", err)
 	}
 
-	err = quit(ctx, name)
+	err = b.quit(ctx, name)
 	if err != nil {
 		t.Errorf("Failed to Restart instance: %v", err)
 	}
 
-	err = deleteInstance(context.Background(), name)
+	err = b.deleteInstance(context.Background(), name)
 	if err != nil {
 		t.Errorf("Failed to Delete instance: %v", err)
 	}

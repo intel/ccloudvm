@@ -107,6 +107,7 @@ type ccvmService struct {
 	hostIPMask    uint32
 	instanceChMap map[chan struct{}]string
 	instanceWg    sync.WaitGroup
+	b             backend
 }
 
 func returnCreateResult(createCmd instanceCmd, name string, err error) {
@@ -242,7 +243,7 @@ func (s *ccvmService) findExistingInstances() {
 			return nil
 		}
 
-		details, err := status(context.Background(), info.Name())
+		details, err := s.b.status(context.Background(), info.Name())
 		if err != nil {
 			fmt.Printf("Unable to read state information for %s\n", info.Name())
 			return filepath.SkipDir
@@ -347,7 +348,7 @@ func (s *ccvmService) create(ctx context.Context, resultCh chan interface{}, arg
 		cmdType:  instanceCmdCreate,
 		resultCh: resultCh,
 		fn: func() error {
-			return createInstance(ctx, resultCh, s.downloadCh, args)
+			return s.b.createInstance(ctx, resultCh, s.downloadCh, args)
 		},
 	}
 }
@@ -364,7 +365,7 @@ func (s *ccvmService) stop(ctx context.Context, instanceName string, resultCh ch
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- stop(ctx, instanceName)
+			resultCh <- s.b.stop(ctx, instanceName)
 			return nil
 		},
 	}
@@ -382,7 +383,7 @@ func (s *ccvmService) start(ctx context.Context, instanceName string, vmSpec *ty
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- start(ctx, instanceName, vmSpec)
+			resultCh <- s.b.start(ctx, instanceName, vmSpec)
 			return nil
 		},
 	}
@@ -400,7 +401,7 @@ func (s *ccvmService) quit(ctx context.Context, instanceName string, resultCh ch
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			resultCh <- quit(ctx, instanceName)
+			resultCh <- s.b.quit(ctx, instanceName)
 			return nil
 		},
 	}
@@ -418,7 +419,7 @@ func (s *ccvmService) delete(ctx context.Context, instanceName string, resultCh 
 		cmdType:  instanceCmdDelete,
 		resultCh: resultCh,
 		fn: func() error {
-			return deleteInstance(ctx, instanceName)
+			return s.b.deleteInstance(ctx, instanceName)
 		},
 	}
 }
@@ -435,7 +436,7 @@ func (s *ccvmService) status(ctx context.Context, instanceName string, resultCh 
 		cmdType:  instanceCmdOther,
 		resultCh: resultCh,
 		fn: func() error {
-			details, err := status(ctx, instanceName)
+			details, err := s.b.status(ctx, instanceName)
 			if err != nil {
 				resultCh <- err
 			} else {
@@ -675,6 +676,7 @@ func startServer(signalCh chan os.Signal) error {
 			instanceChMap: make(map[chan struct{}]string),
 			hostIPs:       make(map[uint32]struct{}),
 			hostIPMask:    0x7f000000 | uint32((os.Getuid()&0xffff)<<8),
+			b:             ccvmBackend{},
 		}
 		svc.run(doneCh, api.actionCh)
 		close(finishedCh)

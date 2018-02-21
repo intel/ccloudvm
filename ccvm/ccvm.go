@@ -27,6 +27,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+type backend interface {
+	createInstance(context.Context, chan interface{}, chan<- downloadRequest, *types.CreateArgs) error
+	start(context.Context, string, *types.VMSpec) error
+	stop(context.Context, string) error
+	quit(context.Context, string) error
+	status(context.Context, string) (*types.InstanceDetails, error)
+	deleteInstance(context.Context, string) error
+}
+
+type ccvmBackend struct{}
+
 func checkMemAvailable(in *types.VMSpec) error {
 	_, available := deviceinfo.GetMemoryInfo()
 	if available == -1 {
@@ -101,7 +112,8 @@ func downloadProgress(resultCh chan interface{}, p progress) {
 	}
 }
 
-func createInstance(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
+func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface{},
+	downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
 	var err error
 
 	wkld, ws, transport, err := prepareCreate(ctx, args)
@@ -197,7 +209,7 @@ func createInstance(ctx context.Context, resultCh chan interface{}, downloadCh c
 	return nil
 }
 
-func start(ctx context.Context, name string, customSpec *types.VMSpec) error {
+func (c ccvmBackend) start(ctx context.Context, name string, customSpec *types.VMSpec) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
@@ -246,7 +258,7 @@ func start(ctx context.Context, name string, customSpec *types.VMSpec) error {
 	return nil
 }
 
-func stop(ctx context.Context, name string) error {
+func (c ccvmBackend) stop(ctx context.Context, name string) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
@@ -262,7 +274,7 @@ func stop(ctx context.Context, name string) error {
 	return nil
 }
 
-func quit(ctx context.Context, name string) error {
+func (c ccvmBackend) quit(ctx context.Context, name string) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
@@ -278,7 +290,7 @@ func quit(ctx context.Context, name string) error {
 	return nil
 }
 
-func status(ctx context.Context, name string) (*types.InstanceDetails, error) {
+func (c ccvmBackend) status(ctx context.Context, name string) (*types.InstanceDetails, error) {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return nil, err
@@ -306,7 +318,7 @@ func status(ctx context.Context, name string) (*types.InstanceDetails, error) {
 	}, nil
 }
 
-func deleteInstance(ctx context.Context, name string) error {
+func (c ccvmBackend) deleteInstance(ctx context.Context, name string) error {
 	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
