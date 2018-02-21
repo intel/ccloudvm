@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -43,13 +44,21 @@ type ServerAPI struct {
 	actionCh chan interface{}
 }
 
-func (s *ServerAPI) sendStartAction(fn func(context.Context, service, chan interface{}), id *int) {
+func (s *ServerAPI) sendStartAction(fn func(context.Context, service, chan interface{}), id *int) error {
 	action := startAction{
 		action:  fn,
 		transCh: make(chan int),
 	}
-	s.actionCh <- action
+
+	select {
+	case s.actionCh <- action:
+	case <-s.signalCh:
+		return errors.New("Operation cancelled")
+	}
+
 	*id = <-action.transCh
+
+	return nil
 }
 
 func (s *ServerAPI) voidResult(id int, reply *struct{}) error {
@@ -58,7 +67,12 @@ func (s *ServerAPI) voidResult(id int, reply *struct{}) error {
 		res: make(chan interface{}),
 	}
 
-	s.actionCh <- result
+	select {
+	case s.actionCh <- result:
+	case <-s.signalCh:
+		return errors.New("Operation cancelled")
+	}
+
 	r := <-result.res
 	if v, ok := r.(error); ok {
 		return v
@@ -68,7 +82,10 @@ func (s *ServerAPI) voidResult(id int, reply *struct{}) error {
 	err, _ := (<-resultCh).(error)
 	*reply = struct{}{}
 
-	s.actionCh <- completeAction(id)
+	select {
+	case s.actionCh <- completeAction(id):
+	case <-s.signalCh:
+	}
 
 	return err
 }
@@ -77,7 +94,11 @@ func (s *ServerAPI) voidResult(id int, reply *struct{}) error {
 // yet completed.
 func (s *ServerAPI) Cancel(arg int, reply *struct{}) error {
 	fmt.Printf("Cancel(%d) called\n", arg)
-	s.actionCh <- cancelAction(arg)
+	select {
+	case s.actionCh <- cancelAction(arg):
+	case <-s.signalCh:
+		return errors.New("Operation cancelled")
+	}
 	*reply = struct{}{}
 	return nil
 }
@@ -88,9 +109,13 @@ func (s *ServerAPI) Cancel(arg int, reply *struct{}) error {
 func (s *ServerAPI) Create(args *types.CreateArgs, id *int) error {
 	fmt.Printf("Create %+v called\n", *args)
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.create(ctx, resultCh, args)
 	}, id)
+
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -111,7 +136,12 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 		res: make(chan interface{}),
 	}
 
-	s.actionCh <- result
+	select {
+	case s.actionCh <- result:
+	case <-s.signalCh:
+		return errors.New("Operation cancelled")
+	}
+
 	r := <-result.res
 	if v, ok := r.(error); ok {
 		fmt.Printf("CreateResult(%d) finished: %v\n", id, err)
@@ -129,7 +159,10 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 		err = v
 	}
 
-	s.actionCh <- completeAction(id)
+	select {
+	case s.actionCh <- completeAction(id):
+	case <-s.signalCh:
+	}
 
 	fmt.Printf("CreateResult(%d) finished: %v\n", id, err)
 
@@ -140,9 +173,13 @@ func (s *ServerAPI) CreateResult(id int, res *types.CreateResult) error {
 func (s *ServerAPI) Stop(instanceName string, id *int) error {
 	fmt.Printf("Stop [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.stop(ctx, instanceName, resultCh)
 	}, id)
+
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -162,9 +199,13 @@ func (s *ServerAPI) StopResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Start(args *types.StartArgs, id *int) error {
 	fmt.Printf("Start [%s] called\n", args.Name)
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.start(ctx, args.Name, &args.VMSpec, resultCh)
 	}, id)
+
+	if err != nil {
+		return err
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -184,9 +225,13 @@ func (s *ServerAPI) StartResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Quit(instanceName string, id *int) error {
 	fmt.Printf("Quit [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.quit(ctx, instanceName, resultCh)
 	}, id)
+
+	if err != nil {
+		return nil
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -206,9 +251,13 @@ func (s *ServerAPI) QuitResult(id int, reply *struct{}) error {
 func (s *ServerAPI) Delete(instanceName string, id *int) error {
 	fmt.Printf("Delete [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.delete(ctx, instanceName, resultCh)
 	}, id)
+
+	if err != nil {
+		return nil
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -228,9 +277,13 @@ func (s *ServerAPI) DeleteResult(id int, reply *struct{}) error {
 func (s *ServerAPI) GetInstanceDetails(instanceName string, id *int) error {
 	fmt.Printf("GetInstanceDetails [%s] called\n", instanceName)
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.status(ctx, instanceName, resultCh)
 	}, id)
+
+	if err != nil {
+		return nil
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -246,7 +299,12 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 		res: make(chan interface{}),
 	}
 
-	s.actionCh <- result
+	select {
+	case s.actionCh <- result:
+	case <-s.signalCh:
+		return errors.New("Operation cancelled")
+	}
+
 	r := <-result.res
 	if v, ok := r.(error); ok {
 		fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, v)
@@ -262,7 +320,10 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 	case types.InstanceDetails:
 		*reply = res
 	}
-	s.actionCh <- completeAction(id)
+	select {
+	case s.actionCh <- completeAction(id):
+	case <-s.signalCh:
+	}
 
 	fmt.Printf("GetInstanceDetailsResult(%d) finished: %v\n", id, err)
 
@@ -273,9 +334,13 @@ func (s *ServerAPI) GetInstanceDetailsResult(id int, reply *types.InstanceDetail
 func (s *ServerAPI) GetInstances(arg struct{}, id *int) error {
 	fmt.Println("GetInstances called")
 
-	s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
+	err := s.sendStartAction(func(ctx context.Context, svc service, resultCh chan interface{}) {
 		svc.getInstances(ctx, resultCh)
 	}, id)
+
+	if err != nil {
+		return nil
+	}
 
 	fmt.Printf("Transaction ID %d\n", *id)
 	return nil
@@ -290,7 +355,12 @@ func (s *ServerAPI) GetInstancesResult(id int, reply *[]string) error {
 		res: make(chan interface{}),
 	}
 
-	s.actionCh <- result
+	select {
+	case s.actionCh <- result:
+	case <-s.signalCh:
+		return errors.New("Operation cancelled")
+	}
+
 	r := <-result.res
 	if v, ok := r.(error); ok {
 		fmt.Printf("GetInstancesResult(%d) finished: %v\n", id, v)
@@ -306,7 +376,11 @@ func (s *ServerAPI) GetInstancesResult(id int, reply *[]string) error {
 	case []string:
 		*reply = res
 	}
-	s.actionCh <- completeAction(id)
+
+	select {
+	case s.actionCh <- completeAction(id):
+	case <-s.signalCh:
+	}
 
 	fmt.Printf("GetInstancesResult(%d) finished: %v\n", id, err)
 

@@ -100,7 +100,6 @@ type ccvmService struct {
 	counter       int
 	shutdownTimer *time.Timer
 	transactions  map[int]transaction
-	shuttingDown  bool
 	cases         []reflect.SelectCase
 	hostIPs       map[uint32]struct{}
 	instances     map[string]chan instanceCmd
@@ -119,6 +118,7 @@ func returnCreateResult(createCmd instanceCmd, name string, err error) {
 			Finished: true,
 		}
 	}
+	close(createCmd.resultCh)
 }
 
 func instanceLoop(name string, instanceCh <-chan instanceCmd, closeCh chan struct{}, wg *sync.WaitGroup) {
@@ -138,6 +138,7 @@ DONE:
 			case instanceCmdCreate:
 				if deleted {
 					cmd.resultCh <- errors.New("Instance already exists (but is being deleted)")
+					close(cmd.resultCh)
 					continue
 				}
 				createCh = make(chan error)
@@ -148,15 +149,18 @@ DONE:
 			default:
 				if deleted {
 					cmd.resultCh <- errors.New("Instance does not exist")
+					close(cmd.resultCh)
 					continue
 				}
 				if createCh != nil {
 					cmd.resultCh <- errors.New("Command not allowed while instance is being created")
+					close(cmd.resultCh)
 					continue
 				}
 				if cmd.cmdType == instanceCmdDelete {
 					err := cmd.fn()
 					cmd.resultCh <- err
+					close(cmd.resultCh)
 					if err == nil {
 						deleted = true
 						close(closeCh)
@@ -164,6 +168,7 @@ DONE:
 				} else {
 					/* Instance loop is only interested in errors from create and delete */
 					_ = cmd.fn()
+					close(cmd.resultCh)
 				}
 			}
 		case err := <-createCh:
@@ -312,11 +317,13 @@ func (s *ccvmService) create(ctx context.Context, resultCh chan interface{}, arg
 	} else {
 		if !hostnameRegexp.MatchString(args.Name) {
 			resultCh <- errors.Errorf("Invalid hostname %s", args.Name)
+			close(resultCh)
 			return
 		}
 
 		if _, ok := s.instances[args.Name]; ok {
 			resultCh <- errors.New("Instance already exists")
+			close(resultCh)
 			return
 		}
 	}
@@ -326,6 +333,7 @@ func (s *ccvmService) create(ctx context.Context, resultCh chan interface{}, arg
 		hostIP, i, err := s.findFreeIP()
 		if err != nil {
 			resultCh <- err
+			close(resultCh)
 			return
 		}
 		args.CustomSpec.HostIP = hostIP
@@ -334,11 +342,13 @@ func (s *ccvmService) create(ctx context.Context, resultCh chan interface{}, arg
 		flatIP, err := flattenIP(args.CustomSpec.HostIP)
 		if err != nil {
 			resultCh <- err
+			close(resultCh)
 			return
 		}
 		_, ok := s.hostIPs[flatIP]
 		if ok {
 			resultCh <- errors.Errorf("IP address %s is already in use", args.CustomSpec.HostIP)
+			close(resultCh)
 			return
 		}
 	}
@@ -357,6 +367,7 @@ func (s *ccvmService) stop(ctx context.Context, instanceName string, resultCh ch
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
+		close(resultCh)
 		return
 	}
 	instanceCh := s.instances[instanceName]
@@ -375,6 +386,7 @@ func (s *ccvmService) start(ctx context.Context, instanceName string, vmSpec *ty
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
+		close(resultCh)
 		return
 	}
 	instanceCh := s.instances[instanceName]
@@ -393,6 +405,7 @@ func (s *ccvmService) quit(ctx context.Context, instanceName string, resultCh ch
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
+		close(resultCh)
 		return
 	}
 	instanceCh := s.instances[instanceName]
@@ -411,6 +424,7 @@ func (s *ccvmService) delete(ctx context.Context, instanceName string, resultCh 
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
+		close(resultCh)
 		return
 	}
 	instanceCh := s.instances[instanceName]
@@ -428,6 +442,7 @@ func (s *ccvmService) status(ctx context.Context, instanceName string, resultCh 
 	instanceName, err := s.getInstance(instanceName)
 	if err != nil {
 		resultCh <- err
+		close(resultCh)
 		return
 	}
 	instanceCh := s.instances[instanceName]
@@ -456,6 +471,7 @@ func (s *ccvmService) getInstances(ctx context.Context, resultCh chan interface{
 	}
 	sort.Strings(names)
 	resultCh <- names
+	close(resultCh)
 }
 
 func (s *ccvmService) processAction(action interface{}) {
@@ -506,9 +522,6 @@ func (s *ccvmService) processAction(action interface{}) {
 		if len(s.transactions) == 0 {
 			if s.shutdownTimer == nil {
 				shutdownIn := time.Minute
-				if s.shuttingDown {
-					shutdownIn = time.Second * 0
-				}
 				s.shutdownTimer = time.NewTimer(shutdownIn)
 				s.cases[TimeChIndex].Chan = reflect.ValueOf(s.shutdownTimer.C)
 			}
@@ -548,14 +561,12 @@ DONE:
 					_ = <-s.shutdownTimer.C
 				}
 			}
-			if len(s.transactions) == 0 {
-				break DONE
-			}
-			s.shuttingDown = true
 			for _, t := range s.transactions {
 				t.cancel()
+				for range t.resultCh {
+				}
 			}
-			s.cases[DoneChIndex].Chan = reflect.ValueOf(nil)
+			break DONE
 		case ActionChIndex:
 			s.processAction(value.Interface())
 		case TimeChIndex:
