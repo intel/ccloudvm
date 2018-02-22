@@ -260,6 +260,11 @@ func (s *ccvmService) findExistingInstances() {
 			return filepath.SkipDir
 		}
 
+		if _, ok := s.hostIPs[flatIP]; ok {
+			fmt.Printf("Host IP address already in use %s\n", details.VMSpec.HostIP)
+			return filepath.SkipDir
+		}
+
 		fmt.Printf("Starting instance %s on %s\n", info.Name(), details.VMSpec.HostIP)
 
 		_ = s.startInstanceLoop(info.Name(), flatIP)
