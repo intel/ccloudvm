@@ -54,7 +54,7 @@ type workload struct {
 	mergedUserData []byte
 }
 
-func (wkld *workload) save(ws *workspace) error {
+func (wkld *workload) save(instanceDir string) error {
 	var buf bytes.Buffer
 
 	_, _ = buf.WriteString("---\n")
@@ -69,7 +69,7 @@ func (wkld *workload) save(ws *workspace) error {
 	_, _ = buf.Write(wkld.mergedUserData)
 	_, _ = buf.WriteString("...\n")
 
-	err = ioutil.WriteFile(path.Join(ws.instanceDir, "state.yaml"),
+	err = ioutil.WriteFile(path.Join(instanceDir, "state.yaml"),
 		buf.Bytes(), 0600)
 	if err != nil {
 		return errors.Wrap(err, "Unable to write instance state")

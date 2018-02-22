@@ -158,7 +158,7 @@ func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface
 		return errors.Wrap(err, "Error applying template to user-data")
 	}
 
-	err = wkld.save(ws)
+	err = wkld.save(ws.instanceDir)
 	if err != nil {
 		return errors.Wrap(err, "Unable to save instance state")
 	}
@@ -242,7 +242,7 @@ func (c ccvmBackend) start(ctx context.Context, name string, customSpec *types.V
 		return err
 	}
 
-	if err := wkld.save(ws); err != nil {
+	if err := wkld.save(ws.instanceDir); err != nil {
 		fmt.Printf("Warning: Failed to update instance state: %v", err)
 	}
 
