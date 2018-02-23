@@ -4,6 +4,8 @@ base_image_name: Fedora 25
 hostname: singlevm
 needs_nested_vm: true
 vm:
+  mem_mib: 4000
+  cpus: 2
 {{with .GoPath}}
   mounts:
   - tag: hostgo

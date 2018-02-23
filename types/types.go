@@ -18,6 +18,7 @@ package types
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path"
 
@@ -65,6 +66,7 @@ type VMSpec struct {
 	Mounts       []Mount       `yaml:"mounts"`
 	Drives       []Drive       `yaml:"drives"`
 	Qemuport     uint          `yaml:"qemuport"`
+	HostIP       net.IP        `yaml:"host_ip"`
 }
 
 // CheckDirectory checks to see if a given absolute path exists and is
@@ -172,6 +174,14 @@ func (in *VMSpec) MergeCustom(customSpec *VMSpec) error {
 	}
 	if customSpec.Qemuport != 0 {
 		in.Qemuport = customSpec.Qemuport
+	}
+
+	if len(customSpec.HostIP) > 0 {
+		in.HostIP = customSpec.HostIP
+	}
+
+	if len(in.HostIP) == 0 {
+		return errors.New("HostIP not defined")
 	}
 
 	in.MergeMounts(customSpec.Mounts)

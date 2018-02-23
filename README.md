@@ -6,25 +6,49 @@
 
 ## Introduction
 
-ccloudvm is a small utility that simplifies the task of creating,
-managing and connecting to virtual machines.  All you need to have
-installed on your machine is:
+Configurable Cloud VM (ccloudvm) is a command line tool for creating and
+managing Virtual Machine (VM) based development environments.  ccloudvm creates
+these development environments from the cloud images of Linux distributions.
+These images have a number of interesting properties.  They are small, quick to
+download, quick to start and are configurable using a tool,
+[cloud-init](https://cloudinit.readthedocs.io/en/latest/), widely adopted in the
+cloud.  ccloudvm builds VM based development environments from either
+pre-shipped or user supplied annotated cloud-init files.
+
+All you need to have installed on your machine is:
 
 - Go 1.8 or greater
 
-Then simply type
+The installation instructions for the latest version of Go can be
+found [here](https://golang.org/doc/install).  Once installed, ensure
+that your PATH environment variable contains the location of
+executables built with the Go tool chain.  This can be done by
+executing the following command.
+
+```
+$ export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+Then, to create a new Ubuntu 16.04 VM, simply type
 
 ```
 go get github.com/intel/ccloudvm
-$GOPATH/bin/ccloudvm create xenial
+ccloudvm setup
+ccloudvm create xenial
 ```
 
-to create a new Ubuntu 16.04 VM.  ccloudvm will install some needed
-dependencies on your local PC such as qemu and xorriso. It will then
-download an Ubuntu Cloud Image and create a VM based on this image.
-It will boot the VM, create an account for you, with the same
-name as your account on your host, and optionally update the default
-packages.
+The go get command downloads, builds and installs ccloudvm.  The
+ccloudvm setup command installs some needed dependencies on your local
+PC such as qemu and xorriso, and initialises a systemd user service.
+The ccloudvm create command downloads an Ubuntu Cloud Image and
+creates a VM based on this image.  It then boots the VM, creates an
+account for you, with the same name as your account on your host, and
+optionally updates the default packages.
+
+ccloudvm will cache the Ubuntu image locally so the next time you
+create another xenial based VM you won't have to wait very long.
+It also knows about HTTP proxies and will mirror your host computer's proxy
+settings inside the VMs it creates.
 
 Once it's finished you'll be able to connect to the the VM via SSH
 using the following command.
@@ -36,10 +60,21 @@ ccloudvm connect
 The command above assumes that either $GOPATH/bin or ~/go/bin is in
 your PATH.
 
-ccloudvm will cache the Ubuntu image locally so the next time you
-create another xenial based VM you won't have to wait very long.
-It also knows about HTTP proxies and will mirror your host computer's proxy
-settings inside the VMs it creates.
+You'll notice that the instance was assigned a name when it was created.  This
+name is used refer to the instance when issuing future ccloudvm commands.  You
+have the option to specify a name when creating an instance, using the --name
+option.  If you do not provide a name, ccloudvm will create one for you.
+Assuming the name of our new instance was 'vague-nimue' the above connect
+command could have been written as.
+
+```
+ccloudvm connect vague-nimue
+```
+
+If there is only one ccloudvm instance in existence the name is optional and
+need not be specified when issuing most commands.  However, if you have created
+two or more instances you will need to specify an instance name when issuing
+ccloudvm commands so ccloudvm knows which instance to operate on.
 
 You can delete the VM you've just created by running,
 
@@ -360,33 +395,32 @@ Mounts added later via the start command will need to be mounted manually.
 
 ### create
 
-ccloudvm create creates and configures a new ccloudvm VM.  Currently,
-only one VM can be configured at any one time.  All the files associated
-with the VM are stored in ~/.ccloudvm.
+ccloudvm create creates and configures a new ccloudvm VM.  All the files associated
+with the VM are stored under the ~/.ccloudvm/instances folder.
 
 An example of ccloudvm create is given below:
 
 ```
-$ ./ccloudvm create xenial
-Installing host dependencies
-OS Detected: ubuntu
+$ ccloudvm create xenial
 Downloading Ubuntu 16.04
-Booting VM with 7 GB RAM and 4 cpus
+Downloaded 289 MB of 289
+Booting VM with 1024 MiB RAM and 1 cpus
 Booting VM : [OK]
-Adding singlevm to /etc/hosts : [OK]
+Adding amused-lancelot to /etc/hosts : [OK]
 VM successfully created!
-Type ccloudvm connect to start using it.
+
+Instance amused-lancelot created
+Type ccloudvm connect amused-lancelot to start using it.
 ```
 
-By default, ccloudvm will assign half of your host's resources to the VM
-that it creates and launches.  If you have 8 CPUs and 8 GB of RAM on your
-host, ccloudvm will assign 4GB of RAM and 4 VCPUs to the guest VM.  You
-can control this behaviour by using the --mem and --cpu options.  For
-example,
+By default, ccloudvm will assign 1GiB of memory, 1 VCPU and 60Gib of disk space
+to each new instance it creates.  These resource allocations can be overridden
+both in the workload specification and on the command line using the --mem, --cpu,
+and --disk options.  For example,
 
-ccloudvm create --cpus 2 -mem 2 ciao
+ccloudvm create --cpus 2 --mem 2048 --disk 10 xenial
 
-Creates and boots a VM with 2 VCPUs and 2 GB of RAM.
+Creates and boots a VM with 2 VCPUs, 2 GB of RAM and a rootfs of max 10 GiB.
 
 The --package-upgrade option can be used to provide a hint to workloads
 indicating whether packages contained within the base image should be updated or not
@@ -413,6 +447,18 @@ You can also allow a login via this port in case ssh fails to work by modifying 
 
 #### Port mappings, Mounts and Drives
 
+Each new instance created by ccloudvm is assigned a host IP address on
+which guest services can be exposed to the host and in some cases the
+outside world.  When creating a new instance you can specifiy the host
+IP address on which to expose guest services using the --hostip
+option.  However, unless you need those services to be accessible
+externally, it's usually best to go with the default behaviour and let
+ccloudvm create choose the host IP address for you.  If you do not specify
+the --hostip option an IP address from the range 127.0.0.0/8 will be
+allocated to your instance.
+
+To expose a guest service you need to map a port on the host IP address assigned
+to your instance to the port on which the service is listening on the guest.
 By default, ccloudvm creates one port mapping for new VMs, 10022-22 for SSH
 access.  You can specify additional port mappings, mounts or drives or even override
 the default settings on the command line.
@@ -423,8 +469,9 @@ For example,
 
 shares the host directory, $HOME/Documents, with the ccloudvm VM using the 9p
 passthrough security model.  The directory can be mounted inside the VM using
-the docs tag.  The command also adds a new port mapping.  127.0.0.1:10000 on
-the host now maps to port 80 on the guest.
+the docs tag.  The command also adds a new port mapping.  HOSTIP:10000 on
+the host now maps to port 80 on the guest, where HOSTIP is the host IP address
+assigned to the instance.
 
 New file backed storage devices can be added to the guest using the
 drive option.  --drive requires at least two parameters.  The first is
@@ -450,36 +497,52 @@ an existing drive path.  For example,
 ./ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
 
 changes the security model of the mount with the hostgo tag and makes the instance
-available via ssh on 127.0.0.1:10023.
+available via ssh on HOSTIP:10023.
 
 
-### delete
+### delete \[instance-name\]
 
 ccloudvm delete, shuts down and deletes all the files associated with the VM.
 
-### status
+### instances
+
+ccloudvm instances, displays information about the existing instances, e.g.,
+
+```
+$ ccloudvm instances
+Name			HostIP		Workload	VCPUs	Mem		Disk	
+alarmed-agravain	127.3.232.2	xenial		1	1024 MiB	16 Gib
+tense-peles		127.3.232.1	xenial		2	2048 MiB	10 Gib
+```
+
+### status \[instance-name\]
 
 ccloudvm status provides information about the current ccloudvm VM, e.g., whether
 it is running, and how to connect to it.  For example,
 
 ```
-$ ccloudvm status
-Status	:	ciao up
-SSH	:	ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i /home/user/.ccloudvm/id_rsa 127.0.0.1 -p 10022
+$ ccloudvm status tense-peles
+Name	:	tense-peles
+HostIP	:	127.3.232.1
+Workload:	xenial
+Status	:	VM up
+SSH	:	ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i /home/markus/.ccloudvm/id_rsa 127.3.232.1 -p 10022
+VCPUs	:	2
+Mem	:	2048 MiB
+Disk	:	10 GiB
 ```
 
-### stop
+### stop \[instance-name\]
 
-ccloudvm stop is used to power down the ccloudvm VM cleanly.
+ccloudvm stop is used to power down a ccloudvm VM cleanly.
 
-### start
+### start \[instance-name\]
 
 ccloudvm start boots a previously created but not running ccloudvm VM.
 The start command also supports the --mem and --cpu options.  So it's
 possible to change the resources assigned to the guest VM by stopping it
 and restarting it, specifying --mem and --cpu.  It's also possible to
-specify additional port mappings or mounts via the start command.  See
-the section on port mappings below.
+specify additional port mappings or mounts via the start command.
 
 Any parameters you pass to the start command override the parameters
 you originally passed to create.  These settings are also persisted.
@@ -501,14 +564,39 @@ file.
 
 For example,
 
-./ccloudvm start -qemuport 9999
+ccloudvm start -qemuport 9999
 
 will let you track qemu logs by running the below command
 
 nc localhost 9999
 
-### quit
+### quit \[instance-name\]
 
 ccloudvm quit terminates the VM immediately.  It does not shut down the OS
 running in the VM cleanly.
 
+### setup
+
+The setup command installs any needed dependencies and enables a
+systemd user service.  ccloudvm is actually a very simple command line
+tool.  It delegates most of the work to a systemd user service.  This
+service is launched by socket activation and only runs when needed.
+If it has no work to do it quits.
+
+### teardown
+
+The ccloudvm teardown command serves two purposes:
+
+1. it deletes all existing instances
+2. it stops the systemd user service, disables it and deletes all the unit files associated with it
+
+An example of its use is as follows:
+
+```
+$ ccloudvm teardown
+Deleting alarmed-agravain
+Deleting tense-peles
+Removing ccloudvm service
+```
+
+Once you run ccloudvm teardown, ccloudvm will be unusable until you run ccloudvm setup.

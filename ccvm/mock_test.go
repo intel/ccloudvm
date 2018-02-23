@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"io/ioutil"
@@ -37,7 +37,6 @@ vm:
     guest: 22
   mounts: []
   disk_gib: 60
-hostname: singlevm
 `
 
 var mockVMSpec = types.VMSpec{

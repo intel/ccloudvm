@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"bufio"
@@ -22,7 +22,9 @@ import (
 	"context"
 	"fmt"
 	"go/build"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -52,7 +54,7 @@ type workload struct {
 	mergedUserData []byte
 }
 
-func (wkld *workload) save(ws *workspace) error {
+func (wkld *workload) save(instanceDir string) error {
 	var buf bytes.Buffer
 
 	_, _ = buf.WriteString("---\n")
@@ -67,7 +69,7 @@ func (wkld *workload) save(ws *workspace) error {
 	_, _ = buf.Write(wkld.mergedUserData)
 	_, _ = buf.WriteString("...\n")
 
-	err = ioutil.WriteFile(path.Join(ws.instanceDir, "state.yaml"),
+	err = ioutil.WriteFile(path.Join(instanceDir, "state.yaml"),
 		buf.Bytes(), 0600)
 	if err != nil {
 		return errors.Wrap(err, "Unable to write instance state")
@@ -93,7 +95,39 @@ func (spec *workloadSpec) ensureSSHPortMapping() {
 	}
 }
 
-func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
+func getWorkload(ctx context.Context, URL string, dest io.WriteCloser, transport *http.Transport) (err error) {
+	defer func() {
+		err1 := dest.Close()
+		if err == nil && err1 != nil {
+			err = err1
+		}
+	}()
+	req, err := http.NewRequest("GET", URL, nil)
+	if err != nil {
+		return
+	}
+	req = req.WithContext(ctx)
+	cli := &http.Client{
+		Transport: transport,
+	}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("Failed to download %s : %s", URL, resp.Status)
+		return
+	}
+
+	_, err = io.Copy(dest, resp.Body)
+
+	return
+}
+
+func workloadFromURL(ctx context.Context, u url.URL, transport *http.Transport) ([]byte, error) {
 	var workloadPath string
 
 	switch u.Scheme {
@@ -108,7 +142,7 @@ func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
 
 		// 60 seconds should be enough to download the workload file
 		ctx, cancelFunc := context.WithTimeout(ctx, 60*time.Second)
-		err = getFile(ctx, u.String(), workloadFile, downloadProgress)
+		err = getWorkload(ctx, u.String(), workloadFile, transport)
 		cancelFunc()
 		if err != nil {
 			return nil, errors.Wrapf(err, "Unable download workload file from %s", u.String())
@@ -123,7 +157,7 @@ func workloadFromURL(ctx context.Context, u url.URL) ([]byte, error) {
 	return ioutil.ReadFile(workloadPath)
 }
 
-func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string) ([]byte, error) {
+func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string, transport *http.Transport) ([]byte, error) {
 	u, err := url.Parse(workloadName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to parse workload name %s", workloadName)
@@ -131,7 +165,7 @@ func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string) (
 
 	// Absolute means that it has a non-empty scheme
 	if u.IsAbs() {
-		return workloadFromURL(ctx, *u)
+		return workloadFromURL(ctx, *u, transport)
 	}
 
 	wkld, err := ioutil.ReadFile(workloadName)
@@ -177,10 +211,6 @@ func (wkld *workload) merge(parent *workload) {
 
 	if wkld.spec.BaseImageName == "" {
 		wkld.spec.BaseImageName = parent.spec.BaseImageName
-	}
-
-	if wkld.spec.Hostname == "" {
-		wkld.spec.Hostname = parent.spec.Hostname
 	}
 
 	// Always better to require nested VM that not.
@@ -315,8 +345,8 @@ func (wkld *workload) generateCloudConfig(ws *workspace) error {
 	return nil
 }
 
-func createWorkload(ctx context.Context, ws *workspace, workloadName string) (*workload, error) {
-	data, err := loadWorkloadData(ctx, ws, workloadName)
+func createWorkload(ctx context.Context, ws *workspace, workloadName string, transport *http.Transport) (*workload, error) {
+	data, err := loadWorkloadData(ctx, ws, workloadName, transport)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +370,7 @@ func createWorkload(ctx context.Context, ws *workspace, workloadName string) (*w
 	}
 
 	if wkld.spec.Inherits != "" {
-		wkld.parent, err = createWorkload(ctx, ws, wkld.spec.Inherits)
+		wkld.parent, err = createWorkload(ctx, ws, wkld.spec.Inherits, transport)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Error loading inherited workload: %s", wkld.spec.Inherits)
 		}

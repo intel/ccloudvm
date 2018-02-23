@@ -14,10 +14,9 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -26,8 +25,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/intel/ccloudvm/types"
@@ -87,10 +86,10 @@ func bootVM(ctx context.Context, ws *workspace, in *types.VMSpec) error {
 	if len(in.PortMappings) > 0 {
 		i := 0
 		p := in.PortMappings[i]
-		b.WriteString(fmt.Sprintf("user,hostfwd=tcp::%d-:%d", p.Host, p.Guest))
+		b.WriteString(fmt.Sprintf("user,hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
 		for i = i + 1; i < len(in.PortMappings); i++ {
 			p := in.PortMappings[i]
-			b.WriteString(fmt.Sprintf(",hostfwd=tcp::%d-:%d", p.Host, p.Guest))
+			b.WriteString(fmt.Sprintf(",hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
 		}
 	}
 
@@ -149,45 +148,12 @@ func quitVM(ctx context.Context, instanceDir string) error {
 	})
 }
 
-func sshReady(ctx context.Context, sshPort int) bool {
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "tcp",
-		fmt.Sprintf("127.0.0.1:%d", sshPort))
-	if err != nil {
-		return false
-	}
-	_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond * 500))
-	scanner := bufio.NewScanner(conn)
-	retval := scanner.Scan()
-	_ = conn.Close()
-	return retval
-}
-
-func statusVM(ctx context.Context, instanceDir, keyPath, workloadName string, sshPort int, qemuport uint) {
-	status := "VM down"
-	ssh := "N/A"
-	if sshReady(ctx, sshPort) {
-		status = "VM up"
-		ssh = fmt.Sprintf("ssh -q -F /dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s 127.0.0.1 -p %d", keyPath, sshPort)
-	}
-
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-	fmt.Fprintf(w, "Workload\t:\t%s\n", workloadName)
-	fmt.Fprintf(w, "Status\t:\t%s\n", status)
-	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
-	if qemuport != 0 {
-		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", qemuport)
-	}
-	_ = w.Flush()
-}
-
-func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
-	r *http.Request) {
+func serveLocalFile(ctx context.Context, downloadCh chan<- downloadRequest, transport *http.Transport,
+	w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	URL := params.Get(urlParam)
 
-	path, err := downloadFile(ctx, URL, ccvmDir, func(progress) {})
+	path, err := downloadFile(ctx, downloadCh, transport, URL, func(progress) {})
 	if err != nil {
 		// May not be the correct error code but the error message is only going
 		// to end up in cloud-init's logs.
@@ -209,10 +175,11 @@ func serveLocalFile(ctx context.Context, ccvmDir string, w http.ResponseWriter,
 	}
 }
 
-func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
-	errCh chan error) {
+func startHTTPServer(ctx context.Context, resultCh chan interface{}, downloadCh chan<- downloadRequest,
+	transport *http.Transport, listener net.Listener, errCh chan error) {
 	finished := false
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var b bytes.Buffer
 		_, err := io.Copy(&b, r.Body)
 		if err != nil {
@@ -221,22 +188,28 @@ func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 		}
 		line := string(b.Bytes())
 		if line == "FINISHED" {
-			_ = listener.Close()
 			finished = true
+			_ = listener.Close()
 			return
 		}
 		if line == "OK" || line == "FAIL" {
-			fmt.Printf("[%s]\n", line)
+			resultCh <- types.CreateResult{
+				Line: fmt.Sprintf("[%s]\n", line),
+			}
 		} else {
-			fmt.Printf("%s : ", line)
+			resultCh <- types.CreateResult{
+				Line: fmt.Sprintf("%s : ", line),
+			}
 		}
 	})
 
-	http.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
-		serveLocalFile(ctx, ccvmDir, w, r)
+	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+		serveLocalFile(ctx, downloadCh, transport, w, r)
 	})
 
-	server := &http.Server{}
+	server := &http.Server{
+		Handler: mux,
+	}
 	go func() {
 		_ = server.Serve(listener)
 		if finished {
@@ -247,12 +220,36 @@ func startHTTPServer(ctx context.Context, ccvmDir string, listener net.Listener,
 	}()
 }
 
-func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *workspace) error {
+func createLocalListener() (net.Listener, int, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "Unable to create listener")
+	}
+
+	_, portStr, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		_ = listener.Close()
+		return nil, 0, errors.Wrap(err, "Unable to parse address of local HTTP server")
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		_ = listener.Close()
+		return nil, 0, errors.Wrap(err, "Unable to determine port number of local HTTP server")
+	}
+
+	return listener, port, nil
+}
+
+func manageInstallation(ctx context.Context, resultCh chan interface{},
+	downloadCh chan<- downloadRequest, transport *http.Transport, listener net.Listener,
+	instanceDir string) error {
 	socket := path.Join(instanceDir, "socket")
 	disconnectedCh := make(chan struct{})
 
 	qmp, _, err := qemu.QMPStart(ctx, socket, qemu.QMPConfig{}, disconnectedCh)
 	if err != nil {
+		_ = listener.Close()
 		return errors.Wrap(err, "Unable to connect to VM")
 	}
 
@@ -269,16 +266,12 @@ func manageInstallation(ctx context.Context, ccvmDir, instanceDir string, ws *wo
 
 	err = qmp.ExecuteQMPCapabilities(ctx)
 	if err != nil {
+		_ = listener.Close()
 		return fmt.Errorf("Unable to query QEMU caps")
 	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ws.HTTPServerPort))
-	if err != nil {
-		return errors.Wrap(err, "Unable to create listener")
-	}
-
 	errCh := make(chan error)
-	startHTTPServer(ctx, ccvmDir, listener, errCh)
+	startHTTPServer(ctx, resultCh, downloadCh, transport, listener, errCh)
 	select {
 	case <-ctx.Done():
 		_ = listener.Close()

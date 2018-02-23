@@ -14,41 +14,70 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
-	"os/exec"
-	"strconv"
-	"syscall"
-	"time"
 
+	"github.com/ciao-project/ciao/deviceinfo"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
 
-func prepareCreate(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) (*workload, *workspace, error) {
-	ws, err := prepareEnv(ctx)
-	if err != nil {
-		return nil, nil, err
+type backend interface {
+	createInstance(context.Context, chan interface{}, chan<- downloadRequest, *types.CreateArgs) error
+	start(context.Context, string, *types.VMSpec) error
+	stop(context.Context, string) error
+	quit(context.Context, string) error
+	status(context.Context, string) (*types.InstanceDetails, error)
+	deleteInstance(context.Context, string) error
+}
+
+type ccvmBackend struct{}
+
+func checkMemAvailable(in *types.VMSpec) error {
+	_, available := deviceinfo.GetMemoryInfo()
+	if available == -1 {
+		return fmt.Errorf("Unable to compute memory statistics of host device")
 	}
 
-	wkld, err := createWorkload(ctx, ws, workloadName)
+	if in.MemMiB > available {
+		return fmt.Errorf("Host device has only %d MiB of RAM available", available)
+	}
+
+	return nil
+}
+
+func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *workspace, *http.Transport, error) {
+	ws, err := prepareEnv(ctx, args.Name)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	ws.HTTPProxy = args.HTTPProxy
+	ws.HTTPSProxy = args.HTTPSProxy
+	ws.NoProxy = args.NoProxy
+	ws.GoPath = args.GoPath
+
+	transport := getHTTPTransport(ws.HTTPProxy, ws.HTTPSProxy, ws.NoProxy)
+
+	wkld, err := createWorkload(ctx, ws, args.WorkloadName, transport)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	in := &wkld.spec.VM
 
-	err = in.MergeCustom(customSpec)
+	err = in.MergeCustom(&args.CustomSpec)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	ws.Mounts = in.Mounts
-	ws.Hostname = wkld.spec.Hostname
+	ws.Hostname = args.Name
 	if ws.NoProxy != "" {
 		ws.NoProxy = fmt.Sprintf("%s,%s,10.0.2.2", ws.Hostname, ws.NoProxy)
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
@@ -56,22 +85,38 @@ func prepareCreate(ctx context.Context, workloadName string, debug bool, update 
 	}
 
 	ws.PackageUpgrade = "false"
-	if update {
+	if args.Update {
 		ws.PackageUpgrade = "true"
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
-		return nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
+		return nil, nil, nil, fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
-	return wkld, ws, nil
+	if err := checkMemAvailable(in); err != nil {
+		return nil, nil, nil, err
+	}
+
+	return wkld, ws, transport, nil
 }
 
-// Create sets up the VM
-func Create(ctx context.Context, workloadName string, debug bool, update bool, customSpec *types.VMSpec) error {
+func downloadProgress(resultCh chan interface{}, p progress) {
+	if p.totalMB >= 0 {
+		resultCh <- types.CreateResult{
+			Line: fmt.Sprintf("Downloaded %d MB of %d\n", p.downloadedMB, p.totalMB),
+		}
+	} else {
+		resultCh <- types.CreateResult{
+			Line: fmt.Sprintf("Downloaded %d MB\n", p.downloadedMB),
+		}
+	}
+}
+
+func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface{},
+	downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
 	var err error
 
-	wkld, ws, err := prepareCreate(ctx, workloadName, debug, update, customSpec)
+	wkld, ws, transport, err := prepareCreate(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -80,9 +125,6 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 	if err == nil {
 		return fmt.Errorf("instance already exists")
 	}
-
-	fmt.Println("Installing host dependencies")
-	installDeps(ctx)
 
 	err = os.MkdirAll(ws.instanceDir, 0755)
 	if err != nil {
@@ -100,23 +142,39 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
+	listener, port, err := createLocalListener()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if listener != nil {
+			_ = listener.Close()
+		}
+	}()
+	ws.HTTPServerPort = port
+
 	err = wkld.generateCloudConfig(ws)
 	if err != nil {
 		return errors.Wrap(err, "Error applying template to user-data")
 	}
 
-	err = wkld.save(ws)
+	err = wkld.save(ws.instanceDir)
 	if err != nil {
 		return errors.Wrap(err, "Unable to save instance state")
 	}
 
-	fmt.Printf("Downloading %s\n", wkld.spec.BaseImageName)
-	qcowPath, err := downloadFile(ctx, wkld.spec.BaseImageURL, ws.ccvmDir, downloadProgress)
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName),
+	}
+
+	qcowPath, err := downloadFile(ctx, downloadCh, transport, wkld.spec.BaseImageURL, func(p progress) {
+		downloadProgress(resultCh, p)
+	})
 	if err != nil {
 		return err
 	}
 
-	err = buildISOImage(ctx, ws.instanceDir, wkld.mergedUserData, ws, debug)
+	err = buildISOImage(ctx, resultCh, wkld.mergedUserData, ws, args.Debug)
 	if err != nil {
 		return err
 	}
@@ -127,27 +185,32 @@ func Create(ctx context.Context, workloadName string, debug bool, update bool, c
 		return err
 	}
 
-	fmt.Printf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs)
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
+	}
 
 	err = bootVM(ctx, ws, &spec)
 	if err != nil {
 		return err
 	}
 
-	err = manageInstallation(ctx, ws.ccvmDir, ws.instanceDir, ws)
+	err = manageInstallation(ctx, resultCh, downloadCh, transport, listener, ws.instanceDir)
+
+	// Ownership of listener passes to manageInstallation
+	listener = nil
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("VM successfully created!")
-	fmt.Println("Type ccloudvm connect to start using it.")
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("VM successfully created!\n"),
+	}
 
 	return nil
 }
 
-// Start launches the VM
-func Start(ctx context.Context, customSpec *types.VMSpec) error {
-	ws, err := prepareEnv(ctx)
+func (c ccvmBackend) start(ctx context.Context, name string, customSpec *types.VMSpec) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -163,19 +226,23 @@ func Start(ctx context.Context, customSpec *types.VMSpec) error {
 		return err
 	}
 
-	memMiB, CPUs := getMemAndCpus()
+	defaults := defaultVMSpec()
 	if in.MemMiB == 0 {
-		in.MemMiB = memMiB
+		in.MemMiB = defaults.MemMiB
 	}
 	if in.CPUs == 0 {
-		in.CPUs = CPUs
+		in.CPUs = defaults.CPUs
 	}
 
 	if wkld.spec.NeedsNestedVM && !hostSupportsNestedKVM() {
 		return fmt.Errorf("nested KVM is not enabled.  Please enable and try again")
 	}
 
-	if err := wkld.save(ws); err != nil {
+	if err := checkMemAvailable(in); err != nil {
+		return err
+	}
+
+	if err := wkld.save(ws.instanceDir); err != nil {
 		fmt.Printf("Warning: Failed to update instance state: %v", err)
 	}
 
@@ -191,9 +258,8 @@ func Start(ctx context.Context, customSpec *types.VMSpec) error {
 	return nil
 }
 
-// Stop requests the VM shuts down cleanly
-func Stop(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func (c ccvmBackend) stop(ctx context.Context, name string) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -208,9 +274,8 @@ func Stop(ctx context.Context) error {
 	return nil
 }
 
-// Quit forceably kills VM
-func Quit(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func (c ccvmBackend) quit(ctx context.Context, name string) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -225,106 +290,36 @@ func Quit(ctx context.Context) error {
 	return nil
 }
 
-// Status prints out VM information
-func Status(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func (c ccvmBackend) status(ctx context.Context, name string) (*types.InstanceDetails, error) {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	wkld, err := restoreWorkload(ws)
 	if err != nil {
-		return errors.Wrap(err, "Unable to load instance state")
+		return nil, errors.Wrap(err, "Unable to load instance state")
 	}
 	in := &wkld.spec.VM
 
 	sshPort, err := in.SSHPort()
 	if err != nil {
-		return fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
+		return nil, fmt.Errorf("Instance does not have SSH port open.  Unable to determine status")
 	}
 
-	statusVM(ctx, ws.instanceDir, ws.keyPath, wkld.spec.WorkloadName,
-		sshPort, in.Qemuport)
-	return nil
+	return &types.InstanceDetails{
+		Name: name,
+		SSH: types.SSHDetails{
+			KeyPath: ws.keyPath,
+			Port:    sshPort,
+		},
+		Workload: wkld.spec.WorkloadName,
+		VMSpec:   *in,
+	}, nil
 }
 
-func waitForSSH(ctx context.Context) (*workspace, int, error) {
-	ws, err := prepareEnv(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	wkld, err := restoreWorkload(ws)
-	if err != nil {
-		return nil, 0, errors.Wrap(err, "Unable to load instance state")
-	}
-	in := &wkld.spec.VM
-
-	sshPort, err := in.SSHPort()
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if !sshReady(ctx, sshPort) {
-		fmt.Printf("Waiting for VM to boot ")
-	DONE:
-		for {
-			select {
-			case <-time.After(time.Second):
-			case <-ctx.Done():
-				return nil, 0, fmt.Errorf("Cancelled")
-			}
-
-			if sshReady(ctx, sshPort) {
-				break DONE
-			}
-
-			fmt.Print(".")
-		}
-		fmt.Println()
-	}
-
-	return ws, sshPort, nil
-}
-
-// Run connects to the VM via SSH and runs the desired command
-func Run(ctx context.Context, command string) error {
-	path, err := exec.LookPath("ssh")
-	if err != nil {
-		return fmt.Errorf("Unable to locate ssh binary")
-	}
-
-	ws, sshPort, err := waitForSSH(ctx)
-	if err != nil {
-		return err
-	}
-
-	args := []string{
-		path,
-		"-q", "-F", "/dev/null",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "IdentitiesOnly=yes",
-		"-i", ws.keyPath,
-		"127.0.0.1", "-p", strconv.Itoa(sshPort),
-	}
-
-	if command != "" {
-		args = append(args, command)
-	}
-
-	err = syscall.Exec(path, args, os.Environ())
-	return err
-}
-
-// Connect opens a shell to the VM via
-func Connect(ctx context.Context) error {
-	return Run(ctx, "")
-}
-
-// Delete the VM
-func Delete(ctx context.Context) error {
-	ws, err := prepareEnv(ctx)
+func (c ccvmBackend) deleteInstance(ctx context.Context, name string) error {
+	ws, err := prepareEnv(ctx, name)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package client
 
 import "github.com/ciao-project/ciao/osprepare"
 

@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"bytes"
@@ -25,11 +25,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"text/template"
 
-	"github.com/ciao-project/ciao/osprepare"
 	"github.com/ciao-project/ciao/uuid"
 	"github.com/intel/ccloudvm/types"
 	"github.com/intel/govmm/qemu"
@@ -42,28 +40,6 @@ const metaDataTemplate = `
   "hostname": "{{.Hostname}}"
 }
 `
-
-type logger struct{}
-
-func (l logger) V(int32) bool {
-	return false
-}
-
-func (l logger) Infof(s string, args ...interface{}) {
-	out := fmt.Sprintf(s, args...)
-	fmt.Print(out)
-	if !strings.HasSuffix(out, "\n") {
-		fmt.Println()
-	}
-}
-
-func (l logger) Warningf(s string, args ...interface{}) {
-	l.Infof(s, args)
-}
-
-func (l logger) Errorf(s string, args ...interface{}) {
-	l.Infof(s, args)
-}
 
 type workspace struct {
 	GoPath         string
@@ -96,10 +72,6 @@ func (w *workspace) MountPath(tag string) string {
 	}
 
 	return ""
-}
-
-func installDeps(ctx context.Context) {
-	osprepare.InstallDeps(ctx, ccloudvmDeps, logger{})
 }
 
 func hostSupportsNestedKVMIntel() bool {
@@ -145,35 +117,10 @@ func prepareSSHKeys(ctx context.Context, ws *workspace) error {
 	return nil
 }
 
-func getProxy(upper, lower string) (string, error) {
-	proxy := os.Getenv(upper)
-	if proxy == "" {
-		proxy = os.Getenv(lower)
-	}
-
-	if proxy == "" {
-		return "", nil
-	}
-
-	if proxy[len(proxy)-1] == '/' {
-		proxy = proxy[:len(proxy)-1]
-	}
-
-	proxyURL, err := url.Parse(proxy)
-	if err != nil {
-		return "", errors.Wrapf(err, "Failed to parse %s", proxy)
-	}
-	return proxyURL.String(), nil
-}
-
-func prepareEnv(ctx context.Context) (*workspace, error) {
+func prepareEnv(ctx context.Context, name string) (*workspace, error) {
 	var err error
 
-	ws := &workspace{HTTPServerPort: 8080}
-	data, err := exec.Command("go", "env", "GOPATH").Output()
-	if err == nil {
-		ws.GoPath = filepath.Clean(strings.TrimSpace(string(data)))
-	}
+	ws := &workspace{}
 	ws.Home = os.Getenv("HOME")
 	if ws.Home == "" {
 		return nil, fmt.Errorf("HOME is not defined")
@@ -186,29 +133,12 @@ func prepareEnv(ctx context.Context) (*workspace, error) {
 	ws.UID = os.Getuid()
 	ws.GID = os.Getgid()
 
-	ws.HTTPProxy, err = getProxy("HTTP_PROXY", "http_proxy")
-	if err != nil {
-		return nil, err
-	}
-
-	ws.HTTPSProxy, err = getProxy("HTTPS_PROXY", "https_proxy")
-	if err != nil {
-		return nil, err
-	}
-
-	if ws.HTTPSProxy != "" {
-		u, _ := url.Parse(ws.HTTPSProxy)
-		u.Scheme = "http"
-		ws.HTTPSProxy = u.String()
-	}
-
-	ws.NoProxy = os.Getenv("no_proxy")
 	ws.ccvmDir = path.Join(ws.Home, ".ccloudvm")
-	ws.instanceDir = path.Join(ws.ccvmDir, "instance")
+	ws.instanceDir = path.Join(ws.ccvmDir, "instances", name)
 	ws.keyPath = path.Join(ws.ccvmDir, "id_rsa")
 	ws.publicKeyPath = fmt.Sprintf("%s.pub", ws.keyPath)
 
-	data, err = exec.Command("git", "config", "--global", "user.name").Output()
+	data, err := exec.Command("git", "config", "--global", "user.name").Output()
 	if err == nil {
 		ws.GitUserName = strings.TrimSpace(string(data))
 	}
@@ -324,7 +254,7 @@ func proxyEnvFN(ws *workspace, indent int) string {
 	return buf.String()
 }
 
-func buildISOImage(ctx context.Context, instanceDir string, userData []byte, ws *workspace, debug bool) error {
+func buildISOImage(ctx context.Context, resultCh chan interface{}, userData []byte, ws *workspace, debug bool) error {
 	mdt, err := template.New("meta-data").Parse(metaDataTemplate)
 	if err != nil {
 		return errors.Wrap(err, "Unable to parse meta data template")
@@ -337,11 +267,15 @@ func buildISOImage(ctx context.Context, instanceDir string, userData []byte, ws 
 	}
 
 	if debug {
-		fmt.Println(string(userData))
-		fmt.Println(string(mdBuf.Bytes()))
+		resultCh <- types.CreateResult{
+			Line: string(userData),
+		}
+		resultCh <- types.CreateResult{
+			Line: string(mdBuf.Bytes()),
+		}
 	}
 
-	return createCloudInitISO(ctx, instanceDir, userData, mdBuf.Bytes())
+	return createCloudInitISO(ctx, ws.instanceDir, userData, mdBuf.Bytes())
 }
 
 func createRootfs(ctx context.Context, backingImage, instanceDir string, disk int) error {

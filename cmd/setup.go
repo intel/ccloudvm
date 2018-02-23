@@ -1,4 +1,5 @@
-// Copyright (c) 2016 Intel Corporation
+/*
+// Copyright (c) 2018 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,36 +12,27 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
-// +build linux
+*/
 
-package ccvm
+package cmd
 
-import "github.com/ciao-project/ciao/deviceinfo"
+import (
+	"github.com/intel/ccloudvm/client"
+	"github.com/spf13/cobra"
+)
 
-func getOnlineCPUs() int {
-	return deviceinfo.GetOnlineCPUs()
+var setupCmd = &cobra.Command{
+	Use:   "setup",
+	Short: "Installs dependencies and sets ccloudvm up for use",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancelFunc := getSignalContext()
+		defer cancelFunc()
+
+		return client.Setup(ctx)
+	},
 }
 
-func getTotalMemory() int {
-	total, _ := deviceinfo.GetMemoryInfo()
-	return total
-}
-
-func getMemAndCpus() (mem int, cpus int) {
-	cpus = getOnlineCPUs() / 2
-	if cpus < 0 {
-		cpus = 1
-	} else if cpus > 8 {
-		cpus = 8
-	}
-
-	mem = getTotalMemory() / 2
-	if mem < 0 {
-		mem = 1024
-	} else if mem > 8 {
-		mem = 8192
-	}
-
-	return mem, cpus
+func init() {
+	rootCmd.AddCommand(setupCmd)
 }

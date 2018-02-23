@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"context"
@@ -91,7 +91,7 @@ func TestCreateWorkload(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create mock workload : %v", err)
 	} else {
-		workload, err := createWorkload(context.Background(), ws, "workload")
+		workload, err := createWorkload(context.Background(), ws, "workload", nil)
 		if err != nil {
 			t.Errorf("Unable to create workload : %v", err)
 		} else {
@@ -105,7 +105,7 @@ func TestCreateWorkload(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create mock workload : %v", err)
 	} else {
-		workload, err := createWorkload(context.Background(), ws, "workload")
+		workload, err := createWorkload(context.Background(), ws, "workload", nil)
 		if err != nil {
 			t.Errorf("Unable to create workload : %v", err)
 		} else {
@@ -167,11 +167,6 @@ func TestRestoreWorkload(t *testing.T) {
 			t.Errorf("Names do not match expected %s got %s",
 				guestImageFriendlyName, workload.spec.BaseImageName)
 		}
-		if defaultHostname != workload.spec.Hostname {
-			t.Errorf("Hostnames do not match expected %s got %s",
-				defaultHostname, workload.spec.Hostname)
-		}
-
 	}
 }
 
@@ -244,7 +239,6 @@ func level0spec() workloadSpec {
 		NeedsNestedVM: true,
 		VM:            defaultVMSpec(),
 		WorkloadName:  "level0",
-		Hostname:      "singlevm",
 	}
 
 	spec.ensureSSHPortMapping()
@@ -405,7 +399,7 @@ func TestWorkloadInheritance(t *testing.T) {
 	}
 
 	for i := range workloads {
-		wkld, err := createWorkload(context.TODO(), ws, workloads[i].name)
+		wkld, err := createWorkload(context.TODO(), ws, workloads[i].name, nil)
 		if err != nil {
 			t.Fatalf("Error creating workloads: %v", err)
 		}
@@ -450,7 +444,7 @@ func TestBaseWorkload(t *testing.T) {
 		t.Fatalf("Failed to create mock workload: %v", err)
 	}
 
-	wkld, err := createWorkload(context.Background(), ws, "")
+	wkld, err := createWorkload(context.Background(), ws, "", nil)
 	if err != nil {
 		t.Fatalf("Error creating workloads: %v", err)
 	}

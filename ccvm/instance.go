@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package ccvm
+package main
 
 import (
 	"bytes"
@@ -35,13 +35,11 @@ const defaultRootFSSize = 60
 const (
 	guestDownloadURL       = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
 	guestImageFriendlyName = "Ubuntu 16.04"
-	defaultHostname        = "singlevm"
 )
 
 type workloadSpec struct {
 	BaseImageURL  string       `yaml:"base_image_url"`
 	BaseImageName string       `yaml:"base_image_name"`
-	Hostname      string       `yaml:"hostname"`
 	WorkloadName  string       `yaml:"workload"`
 	NeedsNestedVM bool         `yaml:"needs_nested_vm"`
 	VM            types.VMSpec `yaml:"vm"`
@@ -49,7 +47,7 @@ type workloadSpec struct {
 }
 
 func defaultVMSpec() types.VMSpec {
-	memDef, cpuDef := getMemAndCpus()
+	memDef, cpuDef := 1024, 1
 
 	return types.VMSpec{
 		MemMiB:  memDef,
@@ -63,7 +61,6 @@ func defaultWorkload() *workload {
 		spec: workloadSpec{
 			BaseImageName: guestImageFriendlyName,
 			BaseImageURL:  guestDownloadURL,
-			Hostname:      defaultHostname,
 			VM:            defaultVMSpec(),
 		},
 	}

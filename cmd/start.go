@@ -19,7 +19,7 @@ package cmd
 import (
 	"flag"
 
-	"github.com/intel/ccloudvm/ccvm"
+	"github.com/intel/ccloudvm/client"
 	"github.com/intel/ccloudvm/types"
 	"github.com/spf13/cobra"
 )
@@ -34,8 +34,13 @@ var startCmd = &cobra.Command{
 		ctx, cancelFunc := getSignalContext()
 		defer cancelFunc()
 
+		var instanceName string
+		if len(args) > 0 {
+			instanceName = args[0]
+		}
+
 		mergeVMOptions(&startSpec, &startMOptsSpec)
-		return ccvm.Start(ctx, &startSpec)
+		return client.Start(ctx, instanceName, &startSpec)
 	},
 }
 

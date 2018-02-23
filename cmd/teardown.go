@@ -1,5 +1,5 @@
-//
-// Copyright (c) 2016 Intel Corporation
+/*
+// Copyright (c) 2018 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,27 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
-// +build !linux
+*/
 
-package ccvm
+package cmd
 
-func getMemAndCpus() (mem int, cpus int) {
-	return 4, 2
+import (
+	"github.com/intel/ccloudvm/client"
+	"github.com/spf13/cobra"
+)
+
+var teardownCmd = &cobra.Command{
+	Use:   "teardown",
+	Short: "Disables the ccloudvm service",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancelFunc := getSignalContext()
+		defer cancelFunc()
+
+		return client.Teardown(ctx)
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(teardownCmd)
 }
