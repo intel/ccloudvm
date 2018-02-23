@@ -75,6 +75,7 @@ KillMode=process
 const systemdSocket = `
 [Socket]
 ListenStream=%s/.ccloudvm/socket
+SocketMode=0600
 
 [Install]
 WantedBy=sockets.target
