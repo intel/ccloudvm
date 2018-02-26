@@ -200,6 +200,48 @@ func testDownloadError(ctx context.Context, t *testing.T, downloadCh chan<- down
 	}
 }
 
+// Logically, this function belongs in ccvm_test.go.  However, we've got all the
+// infrastructure necessary in download_test.go to test downloads, so it's easier
+// to simply include the test here.
+func testDownloadImages(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
+	wkld := &workload{
+		spec: workloadSpec{
+			BaseImageURL: "http://" + addr + "/download/image",
+			BIOS:         "http://" + addr + "/download/bios",
+		},
+	}
+
+	resultCh := make(chan interface{})
+	go func() {
+		img, bios, err := downloadImages(ctx, wkld, http.DefaultTransport.(*http.Transport),
+			resultCh, downloadCh)
+		if err != nil {
+			t.Errorf("Failed to download images: %v", err)
+		}
+		if len(img) == 0 || len(bios) == 0 {
+			t.Errorf("One the paths is empty img=%s bios=%s", img, bios)
+		}
+		close(resultCh)
+	}()
+
+	for range resultCh {
+	}
+
+	wkld.spec.BIOS = "ftp://" + addr + "/download/bios"
+	resultCh = make(chan interface{})
+	go func() {
+		_, _, err := downloadImages(ctx, wkld, http.DefaultTransport.(*http.Transport),
+			resultCh, downloadCh)
+		if err == nil {
+			t.Errorf("Expected downloadImages with bad BIOS URL to fail")
+		}
+		close(resultCh)
+	}()
+
+	for range resultCh {
+	}
+}
+
 func TestDownload(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -252,6 +294,9 @@ func TestDownload(t *testing.T) {
 	})
 	t.Run("doubledifferent", func(t *testing.T) {
 		testDownloadDoubleDifferent(ctx, t, downloadCh, addr, ccvmDir)
+	})
+	t.Run("downloadImages", func(t *testing.T) {
+		testDownloadImages(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	cancel()
 	_ = server.Shutdown(context.Background())

@@ -221,6 +221,7 @@ fields are currently defined:
 - base_image_url  : The URL of the qcow2 image upon which instances of the workload should be based.
 - base_image_name : Friendly name for the base image.  This is optional.
 - vm              : Contains information about creating and booting the instance.
+- bios            : A URI (file, http, or https) pointing to the BIOS file, e.g, OVMF.fd, with which to boot the image.  Should be omitted for legacy boots.
 
 The vm field supports a number of child fields.
 
