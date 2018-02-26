@@ -536,6 +536,22 @@ alarmed-agravain	127.3.232.2	xenial		1	1024 MiB	16 Gib
 tense-peles		127.3.232.1	xenial		2	2048 MiB	10 Gib
 ```
 
+### run \[instance-name\]
+
+The run command can be used to execute a command on a running guest instance
+without having to manually SSH into the guest and type the command.  The
+first argument to the run command is the instance name.  This argument is
+always required even if there is only one instance.  All subsequent arguments
+are passed to the guest to be executed.  For example,
+
+```
+$ ccloudvm run gloomy-arthur "lsb_release --release"
+Release:	16.04
+```
+
+Note that it's best to quote the command that is to be executed on the guest, if
+that command contains more than one word.
+
 ### status \[instance-name\]
 
 ccloudvm status provides information about the current ccloudvm VM, e.g., whether
