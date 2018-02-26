@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sync"
@@ -181,6 +182,23 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 	return
 }
 
+func renameFile(ctx context.Context, tmpImgPath, imgPath string) error {
+	ext := filepath.Ext(imgPath)
+	if ext == ".xz" {
+		err := exec.CommandContext(ctx, "unxz", "-S", ".part", tmpImgPath).Run()
+		if err != nil {
+			return errors.Wrapf(err, "Unable to uncompress %s", imgPath)
+		}
+	} else {
+		err := os.Rename(tmpImgPath, imgPath)
+		if err != nil {
+			return errors.Wrapf(err, "Unable move downloaded file to %s", imgPath)
+		}
+	}
+
+	return nil
+}
+
 func prepareDownload(ctx context.Context, imgPath, name, URL string,
 	transport *http.Transport, progressCh chan updateInfo) (int, error) {
 	tmpImgPath := imgPath + ".part"
@@ -200,10 +218,10 @@ func prepareDownload(ctx context.Context, imgPath, name, URL string,
 		return 0, errors.Wrapf(err, "Unable download file %s", URL)
 	}
 
-	err = os.Rename(tmpImgPath, imgPath)
+	err = renameFile(ctx, tmpImgPath, imgPath)
 	if err != nil {
 		_ = os.Remove(tmpImgPath)
-		return 0, errors.Wrapf(err, "Unable move downloaded file to %s", imgPath)
+		return 0, err
 	}
 
 	return size, nil
