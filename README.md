@@ -32,9 +32,9 @@ $ export PATH=$PATH:$(go env GOPATH)/bin
 Then, to create a new Ubuntu 16.04 VM, simply type
 
 ```
-go get github.com/intel/ccloudvm
-ccloudvm setup
-ccloudvm create xenial
+$ go get github.com/intel/ccloudvm
+$ ccloudvm setup
+$ ccloudvm create xenial
 ```
 
 The go get command downloads, builds and installs ccloudvm.  The
@@ -54,7 +54,7 @@ Once it's finished you'll be able to connect to the the VM via SSH
 using the following command.
 
 ```
-ccloudvm connect
+$ ccloudvm connect
 ```
 
 The command above assumes that either $GOPATH/bin or ~/go/bin is in
@@ -68,7 +68,7 @@ Assuming the name of our new instance was 'vague-nimue' the above connect
 command could have been written as.
 
 ```
-ccloudvm connect vague-nimue
+$ ccloudvm connect vague-nimue
 ```
 
 If there is only one ccloudvm instance in existence the name is optional and
@@ -79,7 +79,7 @@ ccloudvm commands so ccloudvm knows which instance to operate on.
 You can delete the VM you've just created by running,
 
 ```
-ccloudvm delete
+$ ccloudvm delete
 ```
 
 ## Workloads
@@ -88,12 +88,12 @@ Each VM is created from a workload. A workload is a text file which contains
 a set of instructions for initialising the VM.  A workload, among other things,
 can specify:
 
-- The hostname of the VM.
-- The resources to be consumed by the VM
+- The resources to be consumed by the VM, e.g., VCPUs, memory, disk space
 - The base image from which the VM is to be created
 - The folders that should be shared between the host and the VM
 - Any file backed storage that should appear as a device in the VM
-- An annotated cloud-init file that contains the set of instructions
+- An annotated [cloud-init](https://cloudinit.readthedocs.io/en/latest/)
+  file that contains the set of instructions
   to run on the first boot of the VM.  This file is used to create
   user accounts, install packages and configure the VM.
 
@@ -104,43 +104,48 @@ User created workloads are stored in ~/.ccloudvm/workloads.  ccloudvm always che
 ~/.ccloudvm/workloads directory first so if a workload exists in both directories
 with the same name, ccloudvm will use the workload in ~/.ccloudvm/workloads.
 
-Which workload to use is specified when creating the VM with the create
-command. The workload can be a file without the .yaml extension or a URI pointing to
-a local or remote file. If the workload is a file without the .yaml extension then it
-must be present in either of the two directories mentioned above. For example,
-the create command in the introduction section creates an Ubuntu 16.04
-workload (xenial).  This caused ccloudvm to load the workload definition in
+When creating a new instance via the create command the user must specify a workload.
+This can be done by providing the name of a workload, present in one of the two directories
+mentioned above, a URI pointing to either a local or a remote file, or an absolute path.
+
+When specifying a workload by name the .yaml extension should be omitted. For example,
+the command,
+
+```
+$ ccloudvm create xenial
+```
+
+creates a new instance from the workload
 $GOPATH/src/github.com/intel/ccloudvm/workloads/xenial.yaml.
-In the case of a remote file the supported schemes are http, https and file. Be aware
-of the remote file will not be saved hence each time this option is used, ccloudvm
-will try to get it from the remote location. For example, to create a workload using the
+
+Three schemes are supported when specifying a workload via a URI;
+http, https and file.  Note that workloads fetched from URIs are not
+stored locally in the two workload directories mentioned above.  Each
+time this option is used, ccloudvm will try to retrieve the workload
+from the remote location.
+
+An absolute path can also be specified.  This is equivalent to using
+the file scheme. For example, to create a workload using the
 file /home/x/workload.yaml we have two options.
 
 Using the file scheme:
 
 ```
-ccloudvm create file:///home/ccloudvm/workload.yaml
+$ ccloudvm create file:///home/ccloudvm/workload.yaml
 ```
 
-or its absolute path:
+or the absolute path:
 
 ```
-ccloudvm create  /home/ccloudvm/workload.yaml
+$ ccloudvm create  /home/ccloudvm/workload.yaml
 ```
-
-
-As the majority of the ccloudvm workloads are cloud-init files, ccloudvm only
-works with images that are designed to run cloud-init on their first boot.  Typically,
-these are the cloud images, e.g.,. the [Ubuntu Cloud Images](https://cloud-images.ubuntu.com/).
 
 ## Creating new Workloads
 
-ccloudvm workloads are multi-doc YAML files.  The first document contains invariants
-about the VM created from the workload such as the image off which it is based and its
-hostname.  The second contains dynamic instance data that can be altered on every boot,
-such as the number of CPUs the VM uses and the ports mapped.  The final document contains
-the cloud-init file.  If only one section is present it is assumed to the be cloud-init
-file and default values are used for the other two sections.
+ccloudvm workloads are multi-doc YAML files containing two documents.
+The first document describes how to create and boot instances.  The
+second is a cloud-init file containing a list of instructions for
+configuring the guest OS running inside the instances.
 
 An example workload is shown below:
 
@@ -148,10 +153,10 @@ An example workload is shown below:
 ---
 base_image_url: https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
 base_image_name: Ubuntu 16.04
-...
----
-mem_mib: 2048
-cpus: 2
+vm:
+  mem_mib: 2048
+  disk_gib: 16
+  cpus: 2
 ...
 ---
 #cloud-config
@@ -168,6 +173,16 @@ users:
 ...
 ```
 
+This workload can be used to create new instances from the Ubuntu 16.04 cloud images.
+These instances will be assigned 2 GiB of RAM, 2 VCPUs and 16 GiB for their root file
+systems.  A new user will be created inside the guest OS using the user
+name of the user on the host computer that invoked ccloudvm.
+
+Note that ccloudvm only works with images that are designed to run
+cloud-init on their first boot.  Typically, these are the cloud
+images, e.g.,. the [Ubuntu Cloud
+Images](https://cloud-images.ubuntu.com/).
+
 ### Templates
 
 [Go templates](https://golang.org/pkg/text/template/) can be used in each
@@ -182,6 +197,8 @@ of information are available via the workload structure.
  - HTTPSProxy     : The hosts HTTPS proxy if set
  - NoProxy        : The value of the host's no_proxy variable
  - User           : The user who invoked ccloudvm
+ - UID            : The UID of the user who invoked ccloudvm
+ - GID            : The GID of the user who invoked ccloudvm
  - PublicKey      : The public key that will be used to access the instance over SSH
  - GitUserName    : The git user name of the user who ran ccloudvm
  - GitEmail       : The git email address of the user who ran ccloudvm
@@ -190,7 +207,7 @@ of information are available via the workload structure.
  - UUID           : A UUID for the new instance
  - PackageUpgrade : Indicates whether package upgrade should be performed during the first boot.
 
-As an example consider the third document in the workload definition above.  The User and
+As an example consider the second document in the workload definition above.  The User and
 PublicKey fields are accessed via the {{.User}} and {{.PublicKey}} Go templates.  Abstracting
 all of the user and instance specific information via templates in this way allows us to keep our
 workload definitions generic.
@@ -203,24 +220,29 @@ fields are currently defined:
 
 - base_image_url  : The URL of the qcow2 image upon which instances of the workload should be based.
 - base_image_name : Friendly name for the base image.  This is optional.
-- hostname        : The hostname of instances created from this workload.  Hostname is also optional and defaults to singlevm if not provided.
+- vm              : Contains information about creating and booting the instance.
 
-### The Instance Data Document
+The vm field supports a number of child fields.
 
-The second document is called the instance data document.  It contains information that is
-set when an instance is first created but may be modified at a later date, without deleting
-the instance.    Four fields are currently defined:
+- mem_mib    : Number of mebibytes to assign to the VM.  Defaults to 1024 MiBs.
+- disk_gib   : Number of gibibytes to assign to the rootfs of the VM.  Defaults to 60 GiB. 
+- cpus       : Number of CPUs to assign to the VM.  Defaults to 1 VCPU.
+- ports      : Sequence of port objects which map host ports to guest ports
+- mounts     : Sequence of mount objects which describe the folders shared between the host and the guest
+- drives     : Sequence of drive objects which identify resources accessible on the host to be made available as block devices on the guest.
 
-- mem_mib : Number of mebibytes to assign to the VM.  Defaults to half the memory on your machine
-- cpus    : Number of CPUs to assign to the VM.  Defaults to half the cores on your machine
-- ports   : Slice of port objects which map host ports on 127.0.0.1 to guest ports
-- mounts  : Slice of mount objects which describe the folders shared between the host and the guest
-- drives  : Slice of drive objects which identify resources accessible on the host to be made available as block devices on the guest.
+Each instance is associated with one of the host's IP addresses.  Only one instance can be
+associated with one host IP address at any one time.  The user can specify which host IP
+address to use for an instance when the instance is created using the --hostip option.
+If no host IP address is specified, ccloudvm will select an unused IP address from the
+subnet 127.0.0.0/8.  This is usually what you want unless you need to expose a guest service
+to devices other than your host.
 
-Each port object has two members, host and guest.  They are both integers and they specify
-the mapping of port numbers from host to guest.  A default mapping of 10022 to 22 is always
-added so that users can connect to their VMs via ccloudvm connect.  An example port
-mapping is shown below:
+Each port object has two members, host and guest.  They are both
+integers and they specify the mapping of port numbers from host IP
+address of the instance to the guest.  A default mapping of 10022 to
+22 is always added so that users can connect to their VMs via ccloudvm
+connect.  An example port mapping is shown below:
 
 ```
 ports:
@@ -270,20 +292,19 @@ An example of a drive is given below.
 
 ### The Cloudinit document
 
-The third document contains a cloud-init user data file that can be used
+The second document contains a cloud-init user data file that can be used
 to create users, mount folders, install and update packages and perform
 general configuration tasks on the newly created VM.  The user is
 expected to be familiar with the
 [cloudinit file format](https://cloudinit.readthedocs.io/en/latest/).
 
-Like the instance specification and data documents, the cloudinit document
-is processed by the Go template engine before being passed to cloudinit
-running inside the guest VM.  The template engine makes a number of
-functions available to the cloudinit document.  These functions are used
-to perform common tasks such as configuring proxies and communicating with
-ccloudvm running on the host.  Each function must be passed the
-workspace object as the first parameter.  The following functions are
-available:
+The cloudinit document is processed by the Go template engine before
+being passed to cloudinit running inside the guest VM.  The template
+engine makes a number of functions available to the cloudinit
+document.  These functions are used to perform common tasks such as
+configuring proxies and communicating with ccloudvm running on the
+host.  Each function must be passed the workspace object as the first
+parameter.  The following functions are available:
 
 #### proxyVars
 
@@ -373,7 +394,7 @@ failure is presented to the user and the setup of the VM continues.
 
 ### Automatically mounting shared folders
 
-As previously mentioned mounts specified in the instance data document will only
+As previously mentioned, mounts specified in the instance data document will only
 create 9p devices in the guest.  In order to access the files in the shared folder
 you need to arrange to have these devices mounted.  The way you do this might
 differ from distro to distro.  On Ubuntu it is done by adding a mount: section
@@ -390,6 +411,56 @@ the create command line to be mounted to the same location that they are mounted
 host.
 
 Mounts added later via the start command will need to be mounted manually.
+
+### Workload Inheritance
+
+ccloudvm ships with some basic workloads for common Linux distributions such
+as Ubuntu 16.04 and Fedora 25.  These workloads contain a number of generic
+instructions that create a user, configure proxies and arrange for any
+shared host folders to be mounted in the guest.  When creating a new workload
+it's convenient to be able to re-use all of this functionality.  This could
+be done by simply copying your base workload of choice into a new workload file
+and modifying it.  However, there's a much nicer way of doing this.  ccloudvm
+allows you to create a new workload by inheriting from an existing workload.
+This is done by specifying the inherits field in the first document of the workload.
+When workload B inherits from workload A, the contents of workload A
+are merged into the contents of workload B.  If there is a conflict, i.e.,
+workload A and workload B specify different values for the same field, workload B,
+the inheriting workload, takes priority.
+
+```
+---
+inherits: xenial
+vm:
+  disk_gib: 20
+  ports:
+    - host: 8000
+      guest: 80
+...
+---
+package_update: true
+packages:
+ - apache2
+...
+```
+
+In this example we are creating a new workload that inherits from the
+existing xenial workload.  It request a 20 GiB rootfs disk, overriding
+the 16 GiB allocation requested by the parent.  It adds a port mapping
+from 8000 on the instance's host IP address to 80 on the guest's,
+updates the package cache and installs a new package, apache2.  As
+the workload inherits from the xenial workload, instances created from
+this workload will have a user account created for them, will have
+their proxies, if any, set up correctly and any mounts specified at
+creation time will be automatically mounted in the guest.
+
+There are a few last things to note when using workload inheritance.
+You can only inherit from a workload stored in one of the two standard
+workload directories, i.e., it's not possible to specify a URI or an
+absolute path when using the inherits field.  Workload hierarchies are
+supported, i.e., arbitrary levels of inheritance are supported.  There
+is however no multiple inheritance.  A workload can only directly
+inherit from one other workload.
 
 ## Commands
 
@@ -413,14 +484,16 @@ Instance amused-lancelot created
 Type ccloudvm connect amused-lancelot to start using it.
 ```
 
-By default, ccloudvm will assign 1GiB of memory, 1 VCPU and 60Gib of disk space
+By default, ccloudvm will assign 1 GiB of memory, 1 VCPU and 60 GiB of disk space
 to each new instance it creates.  These resource allocations can be overridden
 both in the workload specification and on the command line using the --mem, --cpu,
 and --disk options.  For example,
 
-ccloudvm create --cpus 2 --mem 2048 --disk 10 xenial
+```
+$ ccloudvm create --cpus 2 --mem 2048 --disk 10 xenial
+```
 
-Creates and boots a VM with 2 VCPUs, 2 GB of RAM and a rootfs of max 10 GiB.
+Creates and boots a VM with 2 VCPUs, 2 GiB of RAM and a rootfs of max 10 GiB.
 
 The --package-upgrade option can be used to provide a hint to workloads
 indicating whether packages contained within the base image should be updated or not
@@ -432,7 +505,7 @@ the workloads define the following in their cloudinit documents.
 ```
 package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
 ```
-The -qemuport option can be used to follow qemu boot logs by connecting to user defined port or an entry in the workload yaml
+The --qemuport option can be used to follow qemu boot logs by connecting to user defined port or an entry in the workload yaml
 file.
 
 For example,
@@ -449,7 +522,7 @@ You can also allow a login via this port in case ssh fails to work by modifying 
 
 Each new instance created by ccloudvm is assigned a host IP address on
 which guest services can be exposed to the host and in some cases the
-outside world.  When creating a new instance you can specifiy the host
+outside world.  When creating a new instance you can specify the host
 IP address on which to expose guest services using the --hostip
 option.  However, unless you need those services to be accessible
 externally, it's usually best to go with the default behaviour and let
@@ -465,7 +538,9 @@ the default settings on the command line.
 
 For example,
 
-./ccloudvm create --mount docs,passthrough,$HOME/Documents --port 10000-80 xenial
+```
+$ ccloudvm create --mount docs,passthrough,$HOME/Documents --port 10000-80 xenial
+```
 
 shares the host directory, $HOME/Documents, with the ccloudvm VM using the 9p
 passthrough security model.  The directory can be mounted inside the VM using
@@ -482,7 +557,9 @@ through to the underlying hypervisor.  For example, let's suppose we
 have a qcow2 file called $HOME/img.qcow2.  We could make this file
 accessible as a block device in our VM as follows.
 
-./ccloudvm create --drive $HOME/img.qcow2,qcow2,aio=threads
+```
+$ ccloudvm create --drive $HOME/img.qcow2,qcow2,aio=threads
+```
 
 The drive will appear as a device, e.g., /dev/vdc in the VM.
 
@@ -494,7 +571,9 @@ overridden by mapping a new host port to an existing guest port and
 existing drives can be overridden by providing a new set of options for
 an existing drive path.  For example,
 
-./ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
+```
+$ ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
+```
 
 changes the security model of the mount with the hostgo tag and makes the instance
 available via ssh on HOSTIP:10023.
@@ -514,6 +593,22 @@ Name			HostIP		Workload	VCPUs	Mem		Disk
 alarmed-agravain	127.3.232.2	xenial		1	1024 MiB	16 Gib
 tense-peles		127.3.232.1	xenial		2	2048 MiB	10 Gib
 ```
+
+### run \[instance-name\]
+
+The run command can be used to execute a command on a running guest instance
+without having to manually SSH into the guest and type the command.  The
+first argument to the run command is the instance name.  This argument is
+always required even if there is only one instance.  All subsequent arguments
+are passed to the guest to be executed.  For example,
+
+```
+$ ccloudvm run gloomy-arthur "lsb_release --release"
+Release:	16.04
+```
+
+Note that it's best to quote the command that is to be executed on the guest, if
+that command contains more than one word.
 
 ### status \[instance-name\]
 
@@ -549,11 +644,11 @@ you originally passed to create.  These settings are also persisted.
 For example, if you were to run
 
 ```
-./ccloudvm create --mem=2 xenial
-./ccloudvm stop
-./ccloudvm start --mem=1
-./ccloudvm stop
-./ccloudvm start
+$ ccloudvm create --mem=2 xenial
+$ ccloudvm stop
+$ ccloudvm start --mem=1
+$ ccloudvm stop
+$ ccloudvm start
 ```
 
 The final ccloudvm instance would boot with 1GB of RAM even though no mem
@@ -564,11 +659,15 @@ file.
 
 For example,
 
-ccloudvm start -qemuport 9999
+```
+$ ccloudvm start -qemuport 9999
+```
 
 will let you track qemu logs by running the below command
 
-nc localhost 9999
+```
+$ nc localhost 9999
+```
 
 ### quit \[instance-name\]
 
