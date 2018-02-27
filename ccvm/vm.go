@@ -41,7 +41,7 @@ const (
 	urlParam          = "url"
 )
 
-func bootVM(ctx context.Context, ws *workspace, in *types.VMSpec) error {
+func bootVM(ctx context.Context, ws *workspace, name string, in *types.VMSpec) error {
 	disconnectedCh := make(chan struct{})
 	socket := path.Join(ws.instanceDir, "socket")
 	qmp, _, err := qemu.QMPStart(ctx, socket, qemu.QMPConfig{}, disconnectedCh)
@@ -83,20 +83,18 @@ func bootVM(ctx context.Context, ws *workspace, in *types.VMSpec) error {
 	}
 
 	var b bytes.Buffer
-	if len(in.PortMappings) > 0 {
-		i := 0
-		p := in.PortMappings[i]
-		b.WriteString(fmt.Sprintf("user,hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
-		for i = i + 1; i < len(in.PortMappings); i++ {
-			p := in.PortMappings[i]
-			b.WriteString(fmt.Sprintf(",hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
-		}
+	b.WriteString("user")
+	for _, p := range in.PortMappings {
+		b.WriteString(fmt.Sprintf(",hostfwd=tcp:%s:%d-:%d", in.HostIP, p.Host, p.Guest))
 	}
 
-	netParam := b.String()
-	if len(netParam) > 0 {
-		args = append(args, "-net", netParam)
+	for _, s := range ws.dnsSearch {
+		b.WriteString(fmt.Sprintf(",dnssearch=%s", s))
 	}
+	b.WriteString(fmt.Sprintf(",hostname=%s", name))
+
+	netParam := b.String()
+	args = append(args, "-net", netParam)
 
 	if in.Qemuport != 0 {
 		args = append(args, "-chardev",

@@ -189,7 +189,7 @@ func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface
 		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
 	}
 
-	err = bootVM(ctx, ws, &spec)
+	err = bootVM(ctx, ws, args.Name, &spec)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (c ccvmBackend) start(ctx context.Context, name string, customSpec *types.V
 
 	fmt.Printf("Booting VM with %d MiB RAM and %d cpus\n", in.MemMiB, in.CPUs)
 
-	err = bootVM(ctx, ws, in)
+	err = bootVM(ctx, ws, name, in)
 	if err != nil {
 		return err
 	}

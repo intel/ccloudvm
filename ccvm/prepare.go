@@ -17,6 +17,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -62,6 +63,7 @@ type workspace struct {
 	instanceDir    string
 	keyPath        string
 	publicKeyPath  string
+	dnsSearch      []string
 }
 
 func (w *workspace) MountPath(tag string) string {
@@ -117,6 +119,26 @@ func prepareSSHKeys(ctx context.Context, ws *workspace) error {
 	return nil
 }
 
+func dnsSearch() []string {
+	searches := []string{}
+	data, err := ioutil.ReadFile("/etc/resolv.conf")
+	if err != nil {
+		return nil
+	}
+	scanner := bufio.NewScanner(bytes.NewBuffer(data))
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		if fields[0] != "search" {
+			continue
+		}
+		searches = append(searches, fields[1])
+	}
+	return searches
+}
+
 func prepareEnv(ctx context.Context, name string) (*workspace, error) {
 	var err error
 
@@ -149,6 +171,7 @@ func prepareEnv(ctx context.Context, name string) (*workspace, error) {
 	}
 
 	ws.UUID = uuid.Generate().String()
+	ws.dnsSearch = dnsSearch()
 
 	return ws, nil
 }
