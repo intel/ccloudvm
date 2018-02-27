@@ -32,9 +32,9 @@ $ export PATH=$PATH:$(go env GOPATH)/bin
 Then, to create a new Ubuntu 16.04 VM, simply type
 
 ```
-go get github.com/intel/ccloudvm
-ccloudvm setup
-ccloudvm create xenial
+$ go get github.com/intel/ccloudvm
+$ ccloudvm setup
+$ ccloudvm create xenial
 ```
 
 The go get command downloads, builds and installs ccloudvm.  The
@@ -54,7 +54,7 @@ Once it's finished you'll be able to connect to the the VM via SSH
 using the following command.
 
 ```
-ccloudvm connect
+$ ccloudvm connect
 ```
 
 The command above assumes that either $GOPATH/bin or ~/go/bin is in
@@ -68,7 +68,7 @@ Assuming the name of our new instance was 'vague-nimue' the above connect
 command could have been written as.
 
 ```
-ccloudvm connect vague-nimue
+$ ccloudvm connect vague-nimue
 ```
 
 If there is only one ccloudvm instance in existence the name is optional and
@@ -79,7 +79,7 @@ ccloudvm commands so ccloudvm knows which instance to operate on.
 You can delete the VM you've just created by running,
 
 ```
-ccloudvm delete
+$ ccloudvm delete
 ```
 
 ## Workloads
@@ -112,7 +112,7 @@ When specifying a workload by name the .yaml extension should be omitted. For ex
 the command,
 
 ```
-ccloudvm create xenial
+$ ccloudvm create xenial
 ```
 
 creates a new instance from the workload
@@ -131,13 +131,13 @@ file /home/x/workload.yaml we have two options.
 Using the file scheme:
 
 ```
-ccloudvm create file:///home/ccloudvm/workload.yaml
+$ ccloudvm create file:///home/ccloudvm/workload.yaml
 ```
 
 or the absolute path:
 
 ```
-ccloudvm create  /home/ccloudvm/workload.yaml
+$ ccloudvm create  /home/ccloudvm/workload.yaml
 ```
 
 ## Creating new Workloads
@@ -489,7 +489,9 @@ to each new instance it creates.  These resource allocations can be overridden
 both in the workload specification and on the command line using the --mem, --cpu,
 and --disk options.  For example,
 
-ccloudvm create --cpus 2 --mem 2048 --disk 10 xenial
+```
+$ ccloudvm create --cpus 2 --mem 2048 --disk 10 xenial
+```
 
 Creates and boots a VM with 2 VCPUs, 2 GiB of RAM and a rootfs of max 10 GiB.
 
@@ -503,7 +505,7 @@ the workloads define the following in their cloudinit documents.
 ```
 package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
 ```
-The -qemuport option can be used to follow qemu boot logs by connecting to user defined port or an entry in the workload yaml
+The --qemuport option can be used to follow qemu boot logs by connecting to user defined port or an entry in the workload yaml
 file.
 
 For example,
@@ -536,7 +538,9 @@ the default settings on the command line.
 
 For example,
 
-./ccloudvm create --mount docs,passthrough,$HOME/Documents --port 10000-80 xenial
+```
+$ ccloudvm create --mount docs,passthrough,$HOME/Documents --port 10000-80 xenial
+```
 
 shares the host directory, $HOME/Documents, with the ccloudvm VM using the 9p
 passthrough security model.  The directory can be mounted inside the VM using
@@ -553,7 +557,9 @@ through to the underlying hypervisor.  For example, let's suppose we
 have a qcow2 file called $HOME/img.qcow2.  We could make this file
 accessible as a block device in our VM as follows.
 
-./ccloudvm create --drive $HOME/img.qcow2,qcow2,aio=threads
+```
+$ ccloudvm create --drive $HOME/img.qcow2,qcow2,aio=threads
+```
 
 The drive will appear as a device, e.g., /dev/vdc in the VM.
 
@@ -565,7 +571,9 @@ overridden by mapping a new host port to an existing guest port and
 existing drives can be overridden by providing a new set of options for
 an existing drive path.  For example,
 
-./ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
+```
+$ ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
+```
 
 changes the security model of the mount with the hostgo tag and makes the instance
 available via ssh on HOSTIP:10023.
@@ -636,11 +644,11 @@ you originally passed to create.  These settings are also persisted.
 For example, if you were to run
 
 ```
-./ccloudvm create --mem=2 xenial
-./ccloudvm stop
-./ccloudvm start --mem=1
-./ccloudvm stop
-./ccloudvm start
+$ ccloudvm create --mem=2 xenial
+$ ccloudvm stop
+$ ccloudvm start --mem=1
+$ ccloudvm stop
+$ ccloudvm start
 ```
 
 The final ccloudvm instance would boot with 1GB of RAM even though no mem
@@ -651,11 +659,15 @@ file.
 
 For example,
 
-ccloudvm start -qemuport 9999
+```
+$ ccloudvm start -qemuport 9999
+```
 
 will let you track qemu logs by running the below command
 
-nc localhost 9999
+```
+$ nc localhost 9999
+```
 
 ### quit \[instance-name\]
 
