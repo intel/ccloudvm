@@ -17,7 +17,7 @@ pre-shipped or user supplied annotated cloud-init files.
 
 All you need to have installed on your machine is:
 
-- Go 1.8 or greater
+- Go 1.9 or greater.
 
 The installation instructions for the latest version of Go can be
 found [here](https://golang.org/doc/install).  Once installed, ensure
