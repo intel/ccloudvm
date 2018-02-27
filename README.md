@@ -412,6 +412,56 @@ host.
 
 Mounts added later via the start command will need to be mounted manually.
 
+### Workload Inheritance
+
+ccloudvm ships with some basic workloads for common Linux distributions such
+as Ubuntu 16.04 and Fedora 25.  These workloads contain a number of generic
+instructions that create a user, configure proxies and arrange for any
+shared host folders to be mounted in the guest.  When creating a new workload
+it's convenient to be able to re-use all of this functionality.  This could
+be done by simply copying your base workload of choice into a new workload file
+and modifying it.  However, there's a much nicer way of doing this.  ccloudvm
+allows you to create a new workload by inheriting from an existing workload.
+This is done by specifying the inherits field in the first document of the workload.
+When workload B inherits from workload A, the contents of workload A
+are merged into the contents of workload B.  If there is a conflict, i.e.,
+workload A and workload B specify different values for the same field, workload B,
+the inheriting workload, takes priority.
+
+```
+---
+inherits: xenial
+vm:
+  disk_gib: 20
+  ports:
+    - host: 8000
+      guest: 80
+...
+---
+package_update: true
+packages:
+ - apache2
+...
+```
+
+In this example we are creating a new workload that inherits from the
+existing xenial workload.  It request a 20 GiB rootfs disk, overriding
+the 16 GiB allocation requested by the parent.  It adds a port mapping
+from 8000 on the instance's host IP address to 80 on the guest's,
+updates the package cache and installs a new package, apache2.  As
+the workload inherits from the xenial workload, instances created from
+this workload will have a user account created for them, will have
+their proxies, if any, set up correctly and any mounts specified at
+creation time will be automatically mounted in the guest.
+
+There are a few last things to note when using workload inheritance.
+You can only inherit from a workload stored in one of the two standard
+workload directories, i.e., it's not possible to specify a URI or an
+absolute path when using the inherits field.  Workload hierarchies are
+supported, i.e., arbitrary levels of inheritance are supported.  There
+is however no multiple inheritance.  A workload can only directly
+inherit from one other workload.
+
 ## Commands
 
 ### create
