@@ -185,6 +185,34 @@ func createImages(ctx context.Context, wkld *workload, ws *workspace, args *type
 	return nil
 }
 
+func outputBootingMessage(args *types.CreateArgs, wkld *workload, ws *workspace,
+	resultCh chan interface{}) {
+	spec := &wkld.spec.VM
+
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
+	}
+
+	if !args.Debug {
+		return
+	}
+
+	sshPort, err := spec.SSHPort()
+	if err != nil {
+		return
+	}
+
+	resultCh <- types.CreateResult{
+		Line: "To connect to the instance during its creation type\n\n",
+	}
+
+	fstr := "\tssh -q -F /dev/null -o UserKnownHostsFile=/dev/null " +
+		"-o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s %s -p %d\n"
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf(fstr, ws.keyPath, spec.HostIP, sshPort),
+	}
+}
+
 func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface{},
 	downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
 	var err error
@@ -241,12 +269,9 @@ func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface
 		return err
 	}
 
-	spec := wkld.spec.VM
-	resultCh <- types.CreateResult{
-		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
-	}
+	outputBootingMessage(args, wkld, ws, resultCh)
 
-	err = bootVM(ctx, ws, args.Name, &spec)
+	err = bootVM(ctx, ws, args.Name, &wkld.spec.VM)
 	if err != nil {
 		return err
 	}
