@@ -34,7 +34,7 @@ import (
 	"golang.org/x/net/http/httpproxy"
 )
 
-type progressCB func(p progress)
+type progressCB func(firstCall bool, p progress)
 
 type progress struct {
 	downloadedMB int
@@ -43,9 +43,10 @@ type progress struct {
 }
 
 type downloadUpdate struct {
-	p    progress
-	err  error
-	path string
+	p                 progress
+	err               error
+	path              string
+	alreadyDownloaded bool
 }
 
 type updateInfo struct {
@@ -171,6 +172,13 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 		pr.totalMB = -1
 	} else {
 		pr.totalMB = int(resp.ContentLength / 1000000)
+	}
+
+	progressCh <- updateInfo{
+		p: progress{
+			totalMB: pr.totalMB,
+		},
+		name: pr.name,
 	}
 
 	buf := make([]byte, 1<<20)
@@ -378,9 +386,10 @@ DONE:
 				if _, err := os.Stat(imgPath); err == nil {
 					fmt.Printf("Download of %s finished\n", name)
 					r.progress <- downloadUpdate{
-						p:    df.p,
-						err:  nil,
-						path: df.path,
+						p:                 df.p,
+						err:               nil,
+						path:              df.path,
+						alreadyDownloaded: true,
 					}
 					close(r.progress)
 					continue
@@ -431,10 +440,18 @@ func downloadFile(ctx context.Context, downloadCh chan<- downloadRequest, transp
 		transport: transport,
 	}
 	fmt.Printf("request sent %s\n", URL)
-	var d downloadUpdate
+
+	d := <-progressCh
+	if d.err != nil {
+		return "", d.err
+	}
+	if d.alreadyDownloaded {
+		return d.path, nil
+	}
+	progress(true, d.p)
 	for d = range progressCh {
 		if d.err == nil {
-			progress(d.p)
+			progress(false, d.p)
 		}
 	}
 	if d.err != nil {

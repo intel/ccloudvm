@@ -127,11 +127,13 @@ func downloadImages(ctx context.Context, wkld *workload, transport *http.Transpo
 		if BIOSURL.Scheme == "file" {
 			BIOSPath = BIOSURL.Path
 		} else if BIOSURL.Scheme == "http" || BIOSURL.Scheme == "https" {
-			resultCh <- types.CreateResult{
-				Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BIOS),
-			}
 			BIOSPath, err = downloadFile(ctx, downloadCh, transport, wkld.spec.BIOS,
-				func(p progress) {
+				func(firstDownload bool, p progress) {
+					if firstDownload {
+						resultCh <- types.CreateResult{
+							Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BIOS),
+						}
+					}
 					downloadProgress(resultCh, p)
 				})
 			if err != nil {
@@ -142,13 +144,15 @@ func downloadImages(ctx context.Context, wkld *workload, transport *http.Transpo
 		}
 	}
 
-	resultCh <- types.CreateResult{
-		Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName),
-	}
-
-	qcowPath, err := downloadFile(ctx, downloadCh, transport, wkld.spec.BaseImageURL, func(p progress) {
-		downloadProgress(resultCh, p)
-	})
+	qcowPath, err := downloadFile(ctx, downloadCh, transport,
+		wkld.spec.BaseImageURL, func(firstDownload bool, p progress) {
+			if firstDownload {
+				resultCh <- types.CreateResult{
+					Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName),
+				}
+			}
+			downloadProgress(resultCh, p)
+		})
 	if err != nil {
 		return "", "", err
 	}

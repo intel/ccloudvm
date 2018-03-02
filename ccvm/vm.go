@@ -159,7 +159,8 @@ func serveLocalFile(ctx context.Context, downloadCh chan<- downloadRequest, tran
 	params := r.URL.Query()
 	URL := params.Get(urlParam)
 
-	path, err := downloadFile(ctx, downloadCh, transport, URL, func(progress) {})
+	path, err := downloadFile(ctx, downloadCh, transport, URL,
+		func(bool, progress) {})
 	if err != nil {
 		// May not be the correct error code but the error message is only going
 		// to end up in cloud-init's logs.
