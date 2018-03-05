@@ -194,7 +194,8 @@ func downloadFN(ws *workspace, URL, location string) string {
 }
 
 func beginTaskFN(ws *workspace, message string) string {
-	const infoStr = `curl -X PUT -d "%s" 10.0.2.2:%d`
+	const infoStr = `'curl -X PUT -d "%s" 10.0.2.2:%d'`
+	message = strings.Replace(message, "'", "''", -1)
 	return fmt.Sprintf(infoStr, message, ws.HTTPServerPort)
 }
 
