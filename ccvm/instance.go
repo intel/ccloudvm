@@ -42,6 +42,7 @@ type workloadSpec struct {
 	BaseImageName string       `yaml:"base_image_name"`
 	WorkloadName  string       `yaml:"workload"`
 	NeedsNestedVM bool         `yaml:"needs_nested_vm"`
+	BIOS          string       `yaml:"bios"`
 	VM            types.VMSpec `yaml:"vm"`
 	Inherits      string       `yaml:"inherits"`
 }

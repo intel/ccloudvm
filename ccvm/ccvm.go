@@ -20,7 +20,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
+	"path"
 
 	"github.com/ciao-project/ciao/deviceinfo"
 	"github.com/intel/ccloudvm/types"
@@ -112,6 +115,108 @@ func downloadProgress(resultCh chan interface{}, p progress) {
 	}
 }
 
+func downloadImages(ctx context.Context, wkld *workload, transport *http.Transport,
+	resultCh chan interface{}, downloadCh chan<- downloadRequest) (string, string, error) {
+	var BIOSPath string
+
+	if wkld.spec.BIOS != "" {
+		BIOSURL, err := url.Parse(wkld.spec.BIOS)
+		if err != nil {
+			return "", "", errors.Wrapf(err, "Invalid URL %s", wkld.spec.BIOS)
+		}
+		if BIOSURL.Scheme == "file" {
+			BIOSPath = BIOSURL.Path
+		} else if BIOSURL.Scheme == "http" || BIOSURL.Scheme == "https" {
+			BIOSPath, err = downloadFile(ctx, downloadCh, transport, wkld.spec.BIOS,
+				func(firstDownload bool, p progress) {
+					if firstDownload {
+						resultCh <- types.CreateResult{
+							Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BIOS),
+						}
+					}
+					downloadProgress(resultCh, p)
+				})
+			if err != nil {
+				return "", "", err
+			}
+		} else {
+			return "", "", errors.Errorf("Invalid URL %s", wkld.spec.BIOS)
+		}
+	}
+
+	qcowPath, err := downloadFile(ctx, downloadCh, transport,
+		wkld.spec.BaseImageURL, func(firstDownload bool, p progress) {
+			if firstDownload {
+				resultCh <- types.CreateResult{
+					Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName),
+				}
+			}
+			downloadProgress(resultCh, p)
+		})
+	if err != nil {
+		return "", "", err
+	}
+
+	return BIOSPath, qcowPath, nil
+}
+
+func createImages(ctx context.Context, wkld *workload, ws *workspace, args *types.CreateArgs,
+	transport *http.Transport, resultCh chan interface{}, downloadCh chan<- downloadRequest) error {
+
+	srcBIOSPath, qcowPath, err := downloadImages(ctx, wkld, transport, resultCh, downloadCh)
+	if err != nil {
+		return err
+	}
+
+	if srcBIOSPath != "" {
+		destBIOSPath := path.Join(ws.instanceDir, "BIOS")
+		err := exec.Command("cp", srcBIOSPath, destBIOSPath).Run()
+		if err != nil {
+			return errors.Wrapf(err, "Failed to copy BIOS file %s", srcBIOSPath)
+		}
+	}
+
+	err = buildISOImage(ctx, resultCh, wkld.mergedUserData, ws, args.Debug)
+	if err != nil {
+		return err
+	}
+
+	err = createRootfs(ctx, qcowPath, ws.instanceDir, wkld.spec.VM.DiskGiB)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func outputBootingMessage(args *types.CreateArgs, wkld *workload, ws *workspace,
+	resultCh chan interface{}) {
+	spec := &wkld.spec.VM
+
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
+	}
+
+	if !args.Debug {
+		return
+	}
+
+	sshPort, err := spec.SSHPort()
+	if err != nil {
+		return
+	}
+
+	resultCh <- types.CreateResult{
+		Line: "To connect to the instance during its creation type\n\n",
+	}
+
+	fstr := "\tssh -q -F /dev/null -o UserKnownHostsFile=/dev/null " +
+		"-o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i %s %s -p %d\n"
+	resultCh <- types.CreateResult{
+		Line: fmt.Sprintf(fstr, ws.keyPath, spec.HostIP, sshPort),
+	}
+}
+
 func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface{},
 	downloadCh chan<- downloadRequest, args *types.CreateArgs) error {
 	var err error
@@ -163,33 +268,14 @@ func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface
 		return errors.Wrap(err, "Unable to save instance state")
 	}
 
-	resultCh <- types.CreateResult{
-		Line: fmt.Sprintf("Downloading %s\n", wkld.spec.BaseImageName),
-	}
-
-	qcowPath, err := downloadFile(ctx, downloadCh, transport, wkld.spec.BaseImageURL, func(p progress) {
-		downloadProgress(resultCh, p)
-	})
+	err = createImages(ctx, wkld, ws, args, transport, resultCh, downloadCh)
 	if err != nil {
 		return err
 	}
 
-	err = buildISOImage(ctx, resultCh, wkld.mergedUserData, ws, args.Debug)
-	if err != nil {
-		return err
-	}
+	outputBootingMessage(args, wkld, ws, resultCh)
 
-	spec := wkld.spec.VM
-	err = createRootfs(ctx, qcowPath, ws.instanceDir, spec.DiskGiB)
-	if err != nil {
-		return err
-	}
-
-	resultCh <- types.CreateResult{
-		Line: fmt.Sprintf("Booting VM with %d MiB RAM and %d cpus\n", spec.MemMiB, spec.CPUs),
-	}
-
-	err = bootVM(ctx, ws, args.Name, &spec)
+	err = bootVM(ctx, ws, args.Name, &wkld.spec.VM)
 	if err != nil {
 		return err
 	}

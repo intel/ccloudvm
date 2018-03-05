@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sync"
@@ -33,7 +34,7 @@ import (
 	"golang.org/x/net/http/httpproxy"
 )
 
-type progressCB func(p progress)
+type progressCB func(firstCall bool, p progress)
 
 type progress struct {
 	downloadedMB int
@@ -42,9 +43,10 @@ type progress struct {
 }
 
 type downloadUpdate struct {
-	p    progress
-	err  error
-	path string
+	p                 progress
+	err               error
+	path              string
+	alreadyDownloaded bool
 }
 
 type updateInfo struct {
@@ -172,6 +174,13 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 		pr.totalMB = int(resp.ContentLength / 1000000)
 	}
 
+	progressCh <- updateInfo{
+		p: progress{
+			totalMB: pr.totalMB,
+		},
+		name: pr.name,
+	}
+
 	buf := make([]byte, 1<<20)
 	_, err = io.CopyBuffer(dest, pr, buf)
 	if err == nil {
@@ -179,6 +188,23 @@ func getFile(ctx context.Context, name, URL string, transport *http.Transport,
 	}
 
 	return
+}
+
+func renameFile(ctx context.Context, tmpImgPath, imgPath string) error {
+	ext := filepath.Ext(imgPath)
+	if ext == ".xz" {
+		err := exec.CommandContext(ctx, "unxz", "-S", ".part", tmpImgPath).Run()
+		if err != nil {
+			return errors.Wrapf(err, "Unable to uncompress %s", imgPath)
+		}
+	} else {
+		err := os.Rename(tmpImgPath, imgPath)
+		if err != nil {
+			return errors.Wrapf(err, "Unable move downloaded file to %s", imgPath)
+		}
+	}
+
+	return nil
 }
 
 func prepareDownload(ctx context.Context, imgPath, name, URL string,
@@ -200,10 +226,10 @@ func prepareDownload(ctx context.Context, imgPath, name, URL string,
 		return 0, errors.Wrapf(err, "Unable download file %s", URL)
 	}
 
-	err = os.Rename(tmpImgPath, imgPath)
+	err = renameFile(ctx, tmpImgPath, imgPath)
 	if err != nil {
 		_ = os.Remove(tmpImgPath)
-		return 0, errors.Wrapf(err, "Unable move downloaded file to %s", imgPath)
+		return 0, err
 	}
 
 	return size, nil
@@ -360,9 +386,10 @@ DONE:
 				if _, err := os.Stat(imgPath); err == nil {
 					fmt.Printf("Download of %s finished\n", name)
 					r.progress <- downloadUpdate{
-						p:    df.p,
-						err:  nil,
-						path: df.path,
+						p:                 df.p,
+						err:               nil,
+						path:              df.path,
+						alreadyDownloaded: true,
 					}
 					close(r.progress)
 					continue
@@ -413,10 +440,18 @@ func downloadFile(ctx context.Context, downloadCh chan<- downloadRequest, transp
 		transport: transport,
 	}
 	fmt.Printf("request sent %s\n", URL)
-	var d downloadUpdate
+
+	d := <-progressCh
+	if d.err != nil {
+		return "", d.err
+	}
+	if d.alreadyDownloaded {
+		return d.path, nil
+	}
+	progress(true, d.p)
 	for d = range progressCh {
 		if d.err == nil {
-			progress(d.p)
+			progress(false, d.p)
 		}
 	}
 	if d.err != nil {

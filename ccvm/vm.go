@@ -50,6 +50,10 @@ func bootVM(ctx context.Context, ws *workspace, name string, in *types.VMSpec) e
 		return fmt.Errorf("VM is already running")
 	}
 
+	BIOSPath := path.Join(ws.instanceDir, "BIOS")
+	if _, err := os.Stat(BIOSPath); err != nil {
+		BIOSPath = ""
+	}
 	vmImage := path.Join(ws.instanceDir, "image.qcow2")
 	isoPath := path.Join(ws.instanceDir, "config.iso")
 	memParam := fmt.Sprintf("%dM", in.MemMiB)
@@ -62,6 +66,10 @@ func bootVM(ctx context.Context, ws *workspace, name string, in *types.VMSpec) e
 		"-daemonize", "-enable-kvm", "-cpu", "host",
 		"-net", "nic,model=virtio",
 		"-device", "virtio-rng-pci",
+	}
+
+	if BIOSPath != "" {
+		args = append(args, "-bios", BIOSPath)
 	}
 
 	for i, m := range in.Mounts {
@@ -151,7 +159,8 @@ func serveLocalFile(ctx context.Context, downloadCh chan<- downloadRequest, tran
 	params := r.URL.Query()
 	URL := params.Get(urlParam)
 
-	path, err := downloadFile(ctx, downloadCh, transport, URL, func(progress) {})
+	path, err := downloadFile(ctx, downloadCh, transport, URL,
+		func(bool, progress) {})
 	if err != nil {
 		// May not be the correct error code but the error message is only going
 		// to end up in cloud-init's logs.

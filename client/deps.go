@@ -19,6 +19,7 @@ package client
 import "github.com/ciao-project/ciao/osprepare"
 
 var ccloudvmClearDeps = []osprepare.PackageRequirement{
+	{BinaryName: "/usr/bin/unxz", PackageName: "os-core-update"},
 	{BinaryName: "/usr/bin/qemu-system-x86_64", PackageName: "cloud-control"},
 	{BinaryName: "/usr/bin/xorriso", PackageName: "cloud-control"},
 	{BinaryName: "/usr/bin/ssh", PackageName: "openssh-server"},
@@ -26,6 +27,7 @@ var ccloudvmClearDeps = []osprepare.PackageRequirement{
 }
 
 var ccloudvmFedoraDeps = []osprepare.PackageRequirement{
+	{BinaryName: "/usr/bin/unxz", PackageName: "xz"},
 	{BinaryName: "/usr/bin/qemu-system-x86_64", PackageName: "qemu-system-x86"},
 	{BinaryName: "/usr/bin/qemu-img", PackageName: "qemu-img"},
 	{BinaryName: "/usr/bin/xorriso", PackageName: "xorriso"},
@@ -34,6 +36,7 @@ var ccloudvmFedoraDeps = []osprepare.PackageRequirement{
 }
 
 var ccloudvmUbuntuDeps = []osprepare.PackageRequirement{
+	{BinaryName: "/usr/bin/unxz", PackageName: "xz-utils"},
 	{BinaryName: "/usr/bin/qemu-system-x86_64", PackageName: "qemu-system-x86"},
 	{BinaryName: "/usr/bin/qemu-img", PackageName: "qemu-utils"},
 	{BinaryName: "/usr/bin/xorriso", PackageName: "xorriso"},

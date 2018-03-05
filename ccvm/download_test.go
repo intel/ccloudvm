@@ -67,7 +67,7 @@ func startTestHTTPServer(wg *sync.WaitGroup) (*http.Server, string, error) {
 
 func testDownloadSingle(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
 	path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
-		"http://"+addr+"/download/one", func(p progress) {})
+		"http://"+addr+"/download/one", func(bool, progress) {})
 	if err != nil {
 		t.Errorf("Failed to download file : %v", err)
 	}
@@ -83,7 +83,7 @@ func testDownloadDouble(ctx context.Context, t *testing.T, downloadCh chan<- dow
 	for _, ch := range pathChans {
 		go func(ch chan string) {
 			path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
-				"http://"+addr+"/download/double", func(p progress) {})
+				"http://"+addr+"/download/double", func(bool, progress) {})
 			if err != nil {
 				t.Errorf("Failed to download file : %v", err)
 			}
@@ -110,7 +110,7 @@ func testDownloadDoubleDifferent(ctx context.Context, t *testing.T, downloadCh c
 		go func(ch chan string, i int) {
 			url := fmt.Sprintf("http://%s/download/double-%d", addr, i)
 			path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
-				url, func(p progress) {})
+				url, func(bool, progress) {})
 			if err != nil {
 				t.Errorf("Failed to download file : %v", err)
 			}
@@ -143,7 +143,7 @@ func testDownloadCancelSingle(ctx context.Context, t *testing.T, downloadCh chan
 	cancel()
 	go func() {
 		path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
-			"http://"+addr+"/download/singlecancel", func(p progress) {})
+			"http://"+addr+"/download/singlecancel", func(bool, progress) {})
 		ch <- dld{path, err}
 	}()
 	res := <-ch
@@ -173,7 +173,7 @@ func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, downloadCh ch
 	for _, p := range params {
 		go func(ctx context.Context, ch chan dld) {
 			path, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
-				"http://"+addr+"/download/oneoftwo", func(p progress) {})
+				"http://"+addr+"/download/oneoftwo", func(bool, progress) {})
 			ch <- dld{path, err}
 		}(p.ctx, p.ch)
 	}
@@ -194,9 +194,51 @@ func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, downloadCh ch
 
 func testDownloadError(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
 	_, err := downloadFile(ctx, downloadCh, http.DefaultTransport.(*http.Transport),
-		"http://"+addr+"/error", func(p progress) {})
+		"http://"+addr+"/error", func(bool, progress) {})
 	if err == nil {
 		t.Errorf("Expected download to fail")
+	}
+}
+
+// Logically, this function belongs in ccvm_test.go.  However, we've got all the
+// infrastructure necessary in download_test.go to test downloads, so it's easier
+// to simply include the test here.
+func testDownloadImages(ctx context.Context, t *testing.T, downloadCh chan<- downloadRequest, addr, ccvmDir string) {
+	wkld := &workload{
+		spec: workloadSpec{
+			BaseImageURL: "http://" + addr + "/download/image",
+			BIOS:         "http://" + addr + "/download/bios",
+		},
+	}
+
+	resultCh := make(chan interface{})
+	go func() {
+		img, bios, err := downloadImages(ctx, wkld, http.DefaultTransport.(*http.Transport),
+			resultCh, downloadCh)
+		if err != nil {
+			t.Errorf("Failed to download images: %v", err)
+		}
+		if len(img) == 0 || len(bios) == 0 {
+			t.Errorf("One the paths is empty img=%s bios=%s", img, bios)
+		}
+		close(resultCh)
+	}()
+
+	for range resultCh {
+	}
+
+	wkld.spec.BIOS = "ftp://" + addr + "/download/bios"
+	resultCh = make(chan interface{})
+	go func() {
+		_, _, err := downloadImages(ctx, wkld, http.DefaultTransport.(*http.Transport),
+			resultCh, downloadCh)
+		if err == nil {
+			t.Errorf("Expected downloadImages with bad BIOS URL to fail")
+		}
+		close(resultCh)
+	}()
+
+	for range resultCh {
 	}
 }
 
@@ -252,6 +294,9 @@ func TestDownload(t *testing.T) {
 	})
 	t.Run("doubledifferent", func(t *testing.T) {
 		testDownloadDoubleDifferent(ctx, t, downloadCh, addr, ccvmDir)
+	})
+	t.Run("downloadImages", func(t *testing.T) {
+		testDownloadImages(ctx, t, downloadCh, addr, ccvmDir)
 	})
 	cancel()
 	_ = server.Shutdown(context.Background())
