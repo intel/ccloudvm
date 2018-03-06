@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 
 	"github.com/ciao-project/ciao/deviceinfo"
 	"github.com/intel/ccloudvm/types"
@@ -82,9 +83,20 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 	ws.Mounts = in.Mounts
 	ws.Hostname = args.Name
 	if ws.NoProxy != "" {
-		ws.NoProxy = fmt.Sprintf("%s,%s,10.0.2.2", ws.Hostname, ws.NoProxy)
+		split := strings.Split(ws.NoProxy, ",")
+		var i int
+		for i = 0; i < len(split); i++ {
+			if split[i] == "127.0.0.1" {
+				break
+			}
+		}
+		if i == len(split) {
+			split = append(split, "127.0.0.1")
+		}
+		split = append(split, ws.Hostname, "10.0.2.2")
+		ws.NoProxy = strings.Join(split, ",")
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
-		ws.NoProxy = fmt.Sprintf("%s,10.0.2.2", ws.Hostname)
+		ws.NoProxy = fmt.Sprintf("%s,10.0.2.2,127.0.0.1", ws.Hostname)
 	}
 
 	ws.PackageUpgrade = "false"
