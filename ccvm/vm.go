@@ -203,6 +203,10 @@ func startHTTPServer(ctx context.Context, resultCh chan interface{}, downloadCh 
 			resultCh <- types.CreateResult{
 				Line: fmt.Sprintf("[%s]\n", line),
 			}
+		} else if strings.HasPrefix(line, msgprefix) {
+			resultCh <- types.CreateResult{
+				Line: fmt.Sprintf("%s\n", line[len(msgprefix):]),
+			}
 		} else {
 			resultCh <- types.CreateResult{
 				Line: fmt.Sprintf("%s : ", line),

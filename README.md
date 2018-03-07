@@ -393,6 +393,20 @@ if it fails.
 Reporting a failure back to ccloudvm does not cause the create command to exit.  The
 failure is presented to the user and the setup of the VM continues.
 
+#### The message function
+
+While the task functions are used to provide feedback on tasks run on the guest, this function is used to just provide visual information to the user who invoked ccloudvm on the host.
+
+For example,
+
+```
+- {{message . "All tasks complete. Have fun using the machine" }}
+```
+
+will print
+
+All tasks complete. Have fun using the machine
+
 ### Automatically mounting shared folders
 
 As previously mentioned, mounts specified in the instance data document will only
