@@ -31,6 +31,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var noproxyips = []string{"10.0.2.2", "127.0.0.1", "10.0.2.15"}
+
 type backend interface {
 	createInstance(context.Context, chan interface{}, chan<- downloadRequest, *types.CreateArgs) error
 	start(context.Context, string, *types.VMSpec) error
@@ -84,19 +86,21 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 	ws.Hostname = args.Name
 	if ws.NoProxy != "" {
 		split := strings.Split(ws.NoProxy, ",")
-		var i int
-		for i = 0; i < len(split); i++ {
-			if split[i] == "127.0.0.1" {
-				break
+		for _, npip := range noproxyips {
+			var i int
+			for i = 0; i < len(split); i++ {
+				if split[i] == npip {
+					break
+				}
+			}
+			if i == len(split) {
+				split = append(split, npip)
 			}
 		}
-		if i == len(split) {
-			split = append(split, "127.0.0.1")
-		}
-		split = append(split, ws.Hostname, "10.0.2.2")
+		split = append(split, ws.Hostname)
 		ws.NoProxy = strings.Join(split, ",")
 	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
-		ws.NoProxy = fmt.Sprintf("%s,10.0.2.2,127.0.0.1", ws.Hostname)
+		ws.NoProxy = fmt.Sprintf("%s,10.0.2.2,127.0.0.1,10.0.2.15", ws.Hostname)
 	}
 
 	ws.PackageUpgrade = "false"
