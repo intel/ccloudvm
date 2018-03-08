@@ -58,6 +58,7 @@ type workspace struct {
 	GitEmail       string
 	Mounts         []types.Mount
 	Hostname       string
+	HostIP         string
 	UUID           string
 	PackageUpgrade string
 	ccvmDir        string
