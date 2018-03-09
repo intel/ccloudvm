@@ -24,14 +24,13 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/ciao-project/ciao/deviceinfo"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
-
-var noproxyips = []string{"10.0.2.2", "127.0.0.1", "10.0.2.15"}
 
 type backend interface {
 	createInstance(context.Context, chan interface{}, chan<- downloadRequest, *types.CreateArgs) error
@@ -67,6 +66,9 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 	ws.HTTPSProxy = args.HTTPSProxy
 	ws.NoProxy = args.NoProxy
 	ws.GoPath = args.GoPath
+	if args.CustomSpec.HostIP.IsLoopback() {
+		ws.HostIP = args.CustomSpec.HostIP.String()
+	}
 
 	transport := getHTTPTransport(ws.HTTPProxy, ws.HTTPSProxy, ws.NoProxy)
 
@@ -84,23 +86,25 @@ func prepareCreate(ctx context.Context, args *types.CreateArgs) (*workload, *wor
 
 	ws.Mounts = in.Mounts
 	ws.Hostname = args.Name
-	if ws.NoProxy != "" {
-		split := strings.Split(ws.NoProxy, ",")
-		for _, npip := range noproxyips {
-			var i int
-			for i = 0; i < len(split); i++ {
-				if split[i] == npip {
-					break
-				}
-			}
-			if i == len(split) {
-				split = append(split, npip)
-			}
+
+	if ws.NoProxy != "" || ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
+		npSet := map[string]struct{}{
+			"10.0.2.2":  {},
+			"127.0.0.1": {},
+			"10.0.2.15": {},
+			ws.Hostname: {},
+			ws.HostIP:   {},
 		}
-		split = append(split, ws.Hostname)
-		ws.NoProxy = strings.Join(split, ",")
-	} else if ws.HTTPProxy != "" || ws.HTTPSProxy != "" {
-		ws.NoProxy = fmt.Sprintf("%s,10.0.2.2,127.0.0.1,10.0.2.15", ws.Hostname)
+		for _, np := range strings.Split(ws.NoProxy, ",") {
+			npSet[np] = struct{}{}
+		}
+		delete(npSet, "")
+		var noProxies []string
+		for k := range npSet {
+			noProxies = append(noProxies, k)
+		}
+		sort.Strings(noProxies)
+		ws.NoProxy = strings.Join(noProxies, ",")
 	}
 
 	ws.PackageUpgrade = "false"

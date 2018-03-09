@@ -7,6 +7,8 @@ vm:
   ports:
   - host: 55580
     guest: 80
+  - host: 6080
+    guest: 6080
 ...
 ---
 {{- define "ENV" -}}
@@ -16,6 +18,16 @@ vm:
 {{ define "DEVSTACKPATH" }}{{ if $.MountPath "devstack" }}{{$.MountPath "devstack"}}{{else}}/home/{{.User}}/devstack{{end}}{{end}}
 
 runcmd:
+{{if .HostIP }}
+  - 'printf "%s\n"
+   "auto lo:0"
+   "iface lo:0 inet static"
+   "        address {{.HostIP}}"
+   "        netmask 255.0.0.0"
+   "        network 127.0.0.0"
+    >> /etc/network/interfaces'
+  - 'ifup lo:0'
+{{end}}
   - {{beginTask . "Create gitconfig file with rules" }}
   - su -c 'printf "%s\n"
     "[url \"http://\"]"
@@ -29,11 +41,18 @@ runcmd:
   - {{endTaskCheck .}}
 
 # Once dyamic IP provisioning is available, the HOST_IP can be populated with
-# it against the current static one.
+# it against the current static one.  If the guest VM is connected to a local
+# IP address on the host we use the same local IP address inside the guest.
+# This allows URLs that refer to this IP address to work both in the guest
+# and the host, providing the relevant ports are mapped.
   - {{beginTask . "Create conf file" }}
   - su -c 'printf "%s\n"
     "[[local|localrc]]"
+    {{ if .HostIP -}}
+    "HOST_IP={{.HostIP}}"
+    {{- else -}}
     "HOST_IP=127.0.0.1"
+    {{- end}}
     "ADMIN_PASSWORD=secret"
     "DATABASE_PASSWORD=\$ADMIN_PASSWORD"
     "RABBIT_PASSWORD=\$ADMIN_PASSWORD"
