@@ -593,6 +593,35 @@ $ ccloudvm create --mount hostgo,none,$HOME/go -port 10023-22 xenial
 changes the security model of the mount with the hostgo tag and makes the instance
 available via ssh on HOSTIP:10023.
 
+### copy \[instance-name\] src dest
+
+The copy command is used to copy files between the host and the guest.  Files
+can be transferred in both directions and it's also possible to recursively
+copy directories.  The instance name is optional if there is only one instance.
+Let's look at some examples.
+
+```
+$ ccloudvm copy local.conf local.conf
+```
+
+Copies the local.conf file in the user's current directory on the host
+to the user's home directory in the guest.
+
+```
+$ ccloudvm copy sad-nimue -r inc code/inc
+```
+
+Recursively copies the contents of the directory inc from the host's current
+directory to the ~/code/inc directory on the sad-nimue guest.
+
+Finally,
+
+```
+$ ccloudvm copy -t /var/log/cloud-init-output.log cloud-init-output.log
+```
+
+copies the log file from /var/log/cloud-init-output.log on the guest to the current
+host directory.
 
 ### delete \[instance-name\]
 

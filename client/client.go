@@ -467,23 +467,32 @@ func waitForSSH(ctx context.Context, in *types.InstanceDetails, silent bool) err
 	return nil
 }
 
-// Status prints out VM information
-func Status(ctx context.Context, instanceName string) error {
-	return issueCommand(ctx,
+func getInstanceDetails(ctx context.Context, instanceName string) (types.InstanceDetails, error) {
+	var details types.InstanceDetails
+	err := issueCommand(ctx,
 		func(client *rpc.Client) (int, error) {
 			var id int
 			err := client.Call("ServerAPI.GetInstanceDetails", instanceName, &id)
 			return id, err
 		},
 		func(client *rpc.Client, id int) error {
-			var result types.InstanceDetails
-			err := client.Call("ServerAPI.GetInstanceDetailsResult", id, &result)
+			err := client.Call("ServerAPI.GetInstanceDetailsResult", id, &details)
 			if err != nil {
 				return err
 			}
-			statusVM(ctx, &result)
 			return nil
 		})
+	return details, err
+}
+
+// Status prints out VM information
+func Status(ctx context.Context, instanceName string) error {
+	result, err := getInstanceDetails(ctx, instanceName)
+	if err != nil {
+		return err
+	}
+	statusVM(ctx, &result)
+	return nil
 }
 
 // Run connects to the VM via SSH and runs the desired command
@@ -493,21 +502,7 @@ func Run(ctx context.Context, instanceName, command string) error {
 		return fmt.Errorf("Unable to locate ssh binary")
 	}
 
-	var result types.InstanceDetails
-	err = issueCommand(ctx,
-		func(client *rpc.Client) (int, error) {
-			var id int
-			err := client.Call("ServerAPI.GetInstanceDetails", instanceName, &id)
-			return id, err
-		},
-		func(client *rpc.Client, id int) error {
-			err := client.Call("ServerAPI.GetInstanceDetailsResult", id, &result)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-
+	result, err := getInstanceDetails(ctx, instanceName)
 	if err != nil {
 		return err
 	}
@@ -533,6 +528,43 @@ func Run(ctx context.Context, instanceName, command string) error {
 
 	err = syscall.Exec(path, args, os.Environ())
 	return err
+}
+
+// Copy copies files between the host and the guest using scp
+func Copy(ctx context.Context, instanceName string, recurse, host bool, src, dest string) error {
+	path, err := exec.LookPath("scp")
+	if err != nil {
+		return fmt.Errorf("Unable to locate scp binary")
+	}
+
+	result, err := getInstanceDetails(ctx, instanceName)
+	if err != nil {
+		return err
+	}
+
+	args := []string{
+		path,
+		"-q", "-F", "/dev/null",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "IdentitiesOnly=yes",
+		"-i", result.SSH.KeyPath,
+		"-P", strconv.Itoa(result.SSH.Port),
+	}
+
+	if recurse {
+		args = append(args, "-r")
+	}
+
+	if host {
+		args = append(args, fmt.Sprintf("%s:%s", result.VMSpec.HostIP.String(), src))
+		args = append(args, dest)
+	} else {
+		args = append(args, src)
+		args = append(args, fmt.Sprintf("%s:%s", result.VMSpec.HostIP.String(), dest))
+	}
+
+	return syscall.Exec(path, args, os.Environ())
 }
 
 // Connect opens a shell to the VM via
@@ -573,21 +605,11 @@ func Instances(ctx context.Context) error {
 
 	instanceDetails := make([]types.InstanceDetails, 0, len(instances))
 	for _, name := range instances {
-		_ = issueCommand(ctx,
-			func(client *rpc.Client) (int, error) {
-				var id int
-				err := client.Call("ServerAPI.GetInstanceDetails", name, &id)
-				return id, err
-			},
-			func(client *rpc.Client, id int) error {
-				var details types.InstanceDetails
-				err := client.Call("ServerAPI.GetInstanceDetailsResult", id, &details)
-				if err != nil {
-					return err
-				}
-				instanceDetails = append(instanceDetails, details)
-				return nil
-			})
+		details, err := getInstanceDetails(ctx, name)
+		if err != nil {
+			continue
+		}
+		instanceDetails = append(instanceDetails, details)
 	}
 
 	if len(instanceDetails) == 0 {
