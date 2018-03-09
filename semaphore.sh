@@ -11,6 +11,11 @@ function finish {
 	ccloudvm delete semaphore
     fi
 
+    if [ -f $tfile ]
+    then
+	rm $tfile
+    fi
+
     echo ""
     echo "=============================="
     if [[ $error_code -eq 0 ]]
@@ -129,6 +134,15 @@ echo ""
 instance_ip=$(ccloudvm status semaphore | sed '2q;d' | cut -d ":" -f 2 | xargs)
 
 http_proxy= curl http://$instance_ip:8000
+
+# Copy files between the host and the guest
+
+echo ""
+echo "===== Testing ccloudvm copy ====="
+echo ""
+
+tfile=$(mktemp /tmp/README.XXXXXXXXX)
+ccloudvm copy -t semaphore /etc/resolv.conf $tfile
 
 # Stop the VM
 
