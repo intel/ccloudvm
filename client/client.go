@@ -535,6 +535,57 @@ func Run(ctx context.Context, instanceName, command string) error {
 	return err
 }
 
+// Copy copies files between the host and the guest using scp
+func Copy(ctx context.Context, instanceName string, recurse, host bool, src, dest string) error {
+	path, err := exec.LookPath("scp")
+	if err != nil {
+		return fmt.Errorf("Unable to locate scp binary")
+	}
+
+	var result types.InstanceDetails
+	err = issueCommand(ctx,
+		func(client *rpc.Client) (int, error) {
+			var id int
+			err := client.Call("ServerAPI.GetInstanceDetails", instanceName, &id)
+			return id, err
+		},
+		func(client *rpc.Client, id int) error {
+			err := client.Call("ServerAPI.GetInstanceDetailsResult", id, &result)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+
+	if err != nil {
+		return err
+	}
+
+	args := []string{
+		path,
+		"-q", "-F", "/dev/null",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "IdentitiesOnly=yes",
+		"-i", result.SSH.KeyPath,
+		"-P", strconv.Itoa(result.SSH.Port),
+	}
+
+	if recurse {
+		args = append(args, "-r")
+	}
+
+	if host {
+		args = append(args, fmt.Sprintf("%s:%s", result.VMSpec.HostIP.String(), src))
+		args = append(args, dest)
+	} else {
+		args = append(args, src)
+		args = append(args, fmt.Sprintf("%s:%s", result.VMSpec.HostIP.String(), dest))
+	}
+
+	return syscall.Exec(path, args, os.Environ())
+}
+
 // Connect opens a shell to the VM via
 func Connect(ctx context.Context, instanceName string) error {
 	return Run(ctx, instanceName, "")
