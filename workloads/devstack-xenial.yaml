@@ -2,7 +2,7 @@
 inherits: xenial
 needs_nested_vm: true
 vm:
-  mem_mib: 6144
+  mem_mib: 8192
   cpus: 4
   ports:
   - host: 55580
@@ -11,12 +11,7 @@ vm:
     guest: 6080
 ...
 ---
-{{- define "ENV" -}}
-{{proxyVars .}}
-{{- print " DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true " -}}
-{{end}}
-{{ define "DEVSTACKPATH" }}{{ if $.MountPath "devstack" }}{{$.MountPath "devstack"}}{{else}}/home/{{.User}}/devstack{{end}}{{end}}
-
+package_update: true
 runcmd:
 {{if .HostIP }}
   - 'printf "%s\n"
@@ -35,9 +30,8 @@ runcmd:
     > /home/{{.User}}/.gitconfig' {{.User}}
   - {{endTaskCheck .}}
 
-{{- if not (.MountPath "devstack")}}
   - {{beginTask . "Download devstack" }}
-  - sudo -u {{.User}} {{template "ENV" .}} git clone http://git.openstack.org/openstack-dev/devstack {{template "DEVSTACKPATH" .}}
+  - sudo -u {{.User}} {{proxyVars .}} git clone http://git.openstack.org/openstack-dev/devstack /home/{{.User}}/devstack
   - {{endTaskCheck .}}
 
 # Once dyamic IP provisioning is available, the HOST_IP can be populated with
@@ -57,14 +51,45 @@ runcmd:
     "DATABASE_PASSWORD=\$ADMIN_PASSWORD"
     "RABBIT_PASSWORD=\$ADMIN_PASSWORD"
     "SERVICE_PASSWORD=\$ADMIN_PASSWORD"
-    > {{template "DEVSTACKPATH" .}}/local.conf' {{.User}}
+    > /home/{{.User}}/devstack/local.conf' {{.User}}
   - {{endTaskCheck .}}
-{{ end }}
 
-  - {{beginTask . "Stacking the system" }}
-  - su -c "cd {{template "DEVSTACKPATH" .}} && nohup ./stack.sh > /home/{{.User}}/stack.log &" {{.User}}
-  - {{endTaskCheck . }}
-
-# Will enable this once the other PR is merged. Very crude this way, but github does not support PR dependencies.
-# {{/*messageHost . "Follow stack.log in $HOME to see output of stacking process" */}}
+  - {{message . "" }}
+  - {{message . "====================================================================" }}
+  - {{message . "" }}
+  - {{message . "devstack initialised with a default local.conf" }}
+  - {{message . "" }}
+  - {{message . "    [[local|localrc]]" }}
+{{with .HostIP}}
+  - {{message $ (printf "    HOST_IP=%s" . ) }}
+{{else}}
+  - {{message . "    HOST_IP=127.0.0.1" }}
+{{end}}
+  - {{message . "    ADMIN_PASSWORD=secret" }}
+  - {{message . "    DATABASE_PASSWORD=\\$ADMIN_PASSWORD" }}
+  - {{message . "    RABBIT_PASSWORD=\\$ADMIN_PASSWORD" }}
+  - {{message . "    SERVICE_PASSWORD=\\$ADMIN_PASSWORD" }}
+  - {{message . "" }}
+  - {{message . "To start devstack with these defaults type" }}
+  - {{message . "" }}
+  - {{message . (printf "    ccloudvm run %s 'cd devstack && ./stack.sh'" .Hostname) }}
+  - {{message . "" }}
+  - {{message . "To start with a custom local.conf"}}
+  - {{message . "" }}
+  {{with .HostIP}}
+  - {{message $ (printf "    Set the HOST_IP field of your local.conf to %s" .) }}
+  {{else}}
+  - {{message $ (printf "    Set the HOST_IP field of your local.conf to the HostIP value reported by ccloudvm status %s" $.Hostname) }}
+  {{end}}
+  - {{message . "" }}
+  - {{message . (printf "    ccloudvm copy %s local.conf devstack/local.conf" .Hostname) }}
+  - {{message . (printf "    ccloudvm run %s 'cd devstack && ./stack.sh'" .Hostname) }}
+  - {{message . "" }}
+{{with .HostIP}}
+  - {{message $ (printf "To access horizon point your host's browser at http://%s:55580/dashboard" . ) }}
+  - {{message $ (printf "If you're using proxies ensure that %s is in your no_proxy settings." . ) }}
+  - {{message $ "" }}
+{{end}}
+  - {{message . "====================================================================" }}
+  - {{message . "" }}
 ...
