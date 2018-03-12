@@ -91,7 +91,11 @@ runcmd:
 
  - {{beginTask . "Add K8S repo"}}
  - sudo sh -c "echo 'deb http://apt.kubernetes.io/ kubernetes-xenial-unstable main' >> /etc/apt/sources.list.d/kubernetes.list"
+ - {{endTaskCheck .}}
+
+ - {{beginTask . "Add Google GPG key"}}
  - {{template "ENV" .}}curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+ - {{endTaskCheck .}}
 
  - {{beginTask . "Retrieving updated list of packages"}}
  - {{template "ENV" .}}sudo apt-get update
