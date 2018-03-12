@@ -54,6 +54,9 @@ write_files:
       WantedBy=multi-user.target
    path: /etc/systemd/system/crio.service
 
+packages:
+ - wget
+
 runcmd:
 
  - rm /etc/update-motd.d/10-help-text /etc/update-motd.d/51-cloudguest
@@ -107,9 +110,8 @@ runcmd:
 
  - {{beginTask . "Start Clear Containers Runtime"}}
  - sudo systemctl daemon-reload
+ - sudo systemctl enable docker.service
  - sudo systemctl restart docker
- - sudo systemctl enable cc-proxy.socket
- - sudo systemctl start cc-proxy.socket
  - {{endTaskCheck .}}
 
  - {{beginTask . "Installing GCC"}}
