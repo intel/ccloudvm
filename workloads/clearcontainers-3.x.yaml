@@ -39,20 +39,6 @@ write_files:
      printf "\n"
    path: /etc/update-motd.d/10-ciao-help-text
    permissions: '0755'
- - content: |
-     [Unit]
-      Description=OCI-based implementation of Kubernetes Container Runtime Interface
-      Documentation=https://github.com/kubernetes-incubator/cri-o
-
-      [Service]
-      ExecStart=/usr/bin/crio --debug
-      Environment="HTTP_PROXY={{$.HTTPProxy}}"{{if len .HTTPSProxy}} "HTTPS_PROXY={{.HTTPSProxy}}{{end}}"{{if len .NoProxy}} "NO_PROXY={{.NoProxy}},{{.Hostname}}{{end}}"
-      Restart=on-failure
-      RestartSec=5
-
-      [Install]
-      WantedBy=multi-user.target
-   path: /etc/systemd/system/crio.service
 
 packages:
  - wget
@@ -82,22 +68,6 @@ runcmd:
  - {{beginTask . "Add Clear Containers OBS Repository "}}
  - sudo sh -c "echo 'deb http://download.opensuse.org/repositories/home:/clearcontainers:/clear-containers-3/xUbuntu_16.04/ /' >> /etc/apt/sources.list.d/clear-containers.list"
  - {{template "ENV" .}}curl -fsSL http://download.opensuse.org/repositories/home:/clearcontainers:/clear-containers-3/xUbuntu_16.04/Release.key | sudo apt-key add -
- - {{endTaskCheck .}}
-
- - {{beginTask . "Add CRI-O OS dependency repo"}}
- - {{template "ENV" .}}sudo add-apt-repository "ppa:alexlarsson/flatpak"
- - {{endTaskCheck .}}
-
- - {{beginTask . "Add CRI-O repo"}}
- - {{template "ENV" .}}sudo add-apt-repository "ppa:projectatomic/ppa"
- - {{endTaskCheck .}}
-
- - {{beginTask . "Add K8S repo"}}
- - sudo sh -c "echo 'deb http://apt.kubernetes.io/ kubernetes-xenial-unstable main' >> /etc/apt/sources.list.d/kubernetes.list"
- - {{endTaskCheck .}}
-
- - {{beginTask . "Add Google GPG key"}}
- - {{template "ENV" .}}curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
  - {{endTaskCheck .}}
 
  - {{beginTask . "Retrieving updated list of packages"}}
@@ -130,34 +100,8 @@ runcmd:
  - {{template "ENV" .}}apt-get install build-essential python zlib1g-dev libcap-ng-dev libglib2.0-dev libpixman-1-dev libattr1-dev libcap-dev autoconf libtool libjson-glib-dev uuid-dev check bats libdevmapper-dev file apt-utils wget valgrind lcov libmnl-dev cppcheck libtap-formatter-html-perl -y
  - {{endTaskCheck .}}
 
- - {{beginTask . "Installing CRI-O dependencies"}}
- - {{template "ENV" .}}apt-get install -y socat libgpgme11 libostree-1-1
- - {{endTaskCheck .}}
-
- - {{beginTask . "Installing K8S"}}
- - {{template "ENV" .}}apt-get install -y kubelet=1.7.5-00 kubeadm=1.7.5-00 kubectl=1.7.5-00
- - {{template "ENV" .}}sudo apt-mark hold kubelet kubeadm kubectl
- - {{endTaskCheck .}}
-
- - {{beginTask . "Installing CRI-O"}}
- - {{template "ENV" .}}apt-get install -y cri-o
- - {{endTaskCheck .}}
-
  - {{beginTask . "Auto removing unused development components"}}
  - {{template "ENV" .}}apt-get auto-remove -y
- - {{endTaskCheck .}}
-
- - {{beginTask . "Configuring CRIO for Clear Containers"}}
- - sudo sed -i 's/runtime_untrusted_workload = ""/runtime_untrusted_workload = "\/usr\/bin\/cc-runtime"/' "/etc/crio/crio.conf"
- - {{endTaskCheck .}}
-
- - {{beginTask . "Configuring K8S for CRIO"}}
- - sudo sed -i '/KUBELET_CADVISOR_ARGS/a Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --container-runtime-endpoint=/var/run/crio.sock --runtime-request-timeout=30m"' "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
- - {{endTaskCheck .}}
-
- - {{beginTask . "Start CRI-O daemon"}}
- - sudo systemctl enable crio
- - sudo systemctl start crio
  - {{endTaskCheck .}}
 
  - {{beginTask . "Installing Go development utils"}}
