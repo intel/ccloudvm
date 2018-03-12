@@ -50,7 +50,29 @@ create another xenial based VM you won't have to wait very long.
 It also knows about HTTP proxies and will mirror your host computer's proxy
 settings inside the VMs it creates.
 
-Once it's finished you'll be able to connect to the the VM via SSH
+There's currently a bug which may cause the ccloudvm create command to fail
+if the user on the host computer is not a member of the kvm group.  The
+failure message will look something like this.
+
+```
+Booting VM with 6 GB RAM and 2 cpus
+Failed to launch qemu : exit status 1, Could not access KVM kernel module: Permission denied
+failed to initialize KVM: Permission denied
+```
+
+You can resolve this problem by adding yourself to the group of users
+permitted to access the kvm device. Assuming that this group is called
+kvm you would execute
+
+```
+$ sudo gpasswd -a $USER kvm
+```
+
+and then close your existing terminal and open a new one.  Typing groups
+in the new terminal should confirm that you are now a member of the kvm
+group.
+
+Once the ccloudvm create command is finished you'll be able to connect to the the VM via SSH
 using the following command.
 
 ```
