@@ -1,5 +1,5 @@
 ---
-inherits: xenial
+inherits: docker-xenial
 needs_nested_vm: true
 vm:
   mem_mib: 4000
@@ -30,9 +30,6 @@ write_files:
    path: /etc/update-motd.d/10-ciao-help-text
    permissions: '0755'
  - content: |
-     deb https://download.docker.com/linux/ubuntu xenial stable
-   path: /etc/apt/sources.list.d/docker.list
- - content: |
      deb http://apt.kubernetes.io/ kubernetes-xenial main
    path: /etc/apt/sources.list.d/kubernetes.list
 
@@ -55,27 +52,12 @@ runcmd:
 
  - rm /tmp/go1.9.linux-amd64.tar.gz
 
- - groupadd docker
- - sudo gpasswd -a {{.User}} docker
-
- - {{beginTask . "Installing apt-transport-https and ca-certificates" }}
- - {{template "ENV" .}}apt-get install apt-transport-https ca-certificates
- - {{endTaskCheck .}}
-
- - {{beginTask . "Add docker GPG key" }}
- - {{template "ENV" .}}curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
- - {{endTaskCheck .}}
-
  - {{beginTask . "Add Google GPG key" }}
  - {{template "ENV" .}}curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
  - {{endTaskCheck .}}
 
  - {{beginTask . "Retrieving updated list of packages"}}
  - {{template "ENV" .}}apt-get update
- - {{endTaskCheck .}}
-
- - {{beginTask . "Installing Docker"}}
- - {{template "ENV" .}}apt-get install docker-ce -y
  - {{endTaskCheck .}}
 
  - {{beginTask . "Installing kubectl"}}
