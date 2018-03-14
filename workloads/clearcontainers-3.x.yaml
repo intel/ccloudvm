@@ -31,10 +31,10 @@ write_files:
      printf "Your go code is at {{template "GOPATH" .}}\n"
      printf "You can also edit your code on your host system \n"
      printf "To build cc-runtime from sources \n"
-     printf "go get -d github.com/clearcontainers/runtime... \n"
+     printf "go get -d github.com/clearcontainers/runtime/... \n"
      printf "cd {{template "GOPATH" .}}/src/github.com/clearcontainers/runtime \n"
      printf "make build-cc-system\n"
-     printf "sudo -E PATH=$PATH make install-cc-system \n"
+     printf "sudo -E PATH=\$PATH make install-cc-system \n"
      printf "\n"
      printf "\n"
    path: /etc/update-motd.d/10-ciao-help-text
@@ -121,5 +121,7 @@ runcmd:
  - sudo -u {{.User}} git config --global user.email {{.GitEmail}}
  - {{endTaskCheck .}}
 {{end}}
+
+ - echo "export PATH=\$PATH:{{template "GOPATH" . }}/bin:/usr/local/go/bin" >> /home/{{.User}}/.profile
 
 ...
