@@ -22,7 +22,7 @@ write_files:
  - content: |
      [Service]
      ExecStart=
-     ExecStart=/usr/bin/dockerd -D --add-runtime cor=/usr/bin/cc-runtime --default-runtime=cor
+     ExecStart=/usr/bin/dockerd -D --add-runtime cc-runtime=/usr/bin/cc-runtime --default-runtime=cc-runtime
    path: /etc/systemd/system/docker.service.d/clr-containers.conf
  - content: |
      #!/bin/sh
