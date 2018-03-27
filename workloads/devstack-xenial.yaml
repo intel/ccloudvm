@@ -13,6 +13,13 @@ vm:
 ---
 package_update: true
 runcmd:
+# Create stack user with password 'stack' with sudo permissions
+  - {{beginTask . "Create stack user" }}
+  - useradd stack --password '$6$rounds=4096$MR2zoeakPq$e7pPUB1SeBd3FwcsFCdcQG.ayHF2gAzkCvCQj.ff/wD0MBB.5H4atzRR0DK9il.b3wFt0FjN13CtdVxbtp9x9.' --shell /bin/bash -m
+  - {{endTaskCheck . }}
+  - {{beginTask . "Add stack user to sudo list" }}
+  - printf "stack ALL=(ALL) NOPASSWD:ALL\n" >> /etc/sudoers.d/90-cloud-init-users
+  - {{endTaskCheck . }}
 {{if .HostIP }}
   - 'printf "%s\n"
    "auto lo:0"
@@ -27,11 +34,11 @@ runcmd:
   - su -c 'printf "%s\n"
     "[url \"http://\"]"
     "  insteadOf=git://"
-    > /home/{{.User}}/.gitconfig' {{.User}}
+    > /home/stack/.gitconfig' stack
   - {{endTaskCheck .}}
 
   - {{beginTask . "Download devstack" }}
-  - sudo -u {{.User}} {{proxyVars .}} git clone http://git.openstack.org/openstack-dev/devstack /home/{{.User}}/devstack
+  - sudo -u stack {{proxyVars .}} git clone http://git.openstack.org/openstack-dev/devstack /home/stack/devstack
   - {{endTaskCheck .}}
 
 # Once dyamic IP provisioning is available, the HOST_IP can be populated with
@@ -51,7 +58,7 @@ runcmd:
     "DATABASE_PASSWORD=\$ADMIN_PASSWORD"
     "RABBIT_PASSWORD=\$ADMIN_PASSWORD"
     "SERVICE_PASSWORD=\$ADMIN_PASSWORD"
-    > /home/{{.User}}/devstack/local.conf' {{.User}}
+    > /home/stack/devstack/local.conf' stack
   - {{endTaskCheck .}}
 
   - {{message . "" }}
@@ -72,7 +79,8 @@ runcmd:
   - {{message . "" }}
   - {{message . "To start devstack with these defaults type" }}
   - {{message . "" }}
-  - {{message . (printf "    ccloudvm run %s 'cd devstack && ./stack.sh'" .Hostname) }}
+  - {{message . (printf "    ccloudvm connect %s" .Hostname) }}
+  - {{message . "    sudo su -c 'cd devstack && ./stack.sh' -l stack" }}
   - {{message . "" }}
   - {{message . "To start with a custom local.conf"}}
   - {{message . "" }}
@@ -82,8 +90,9 @@ runcmd:
   - {{message $ (printf "    Set the HOST_IP field of your local.conf to the HostIP value reported by ccloudvm status %s" $.Hostname) }}
   {{end}}
   - {{message . "" }}
-  - {{message . (printf "    ccloudvm copy %s local.conf devstack/local.conf" .Hostname) }}
-  - {{message . (printf "    ccloudvm run %s 'cd devstack && ./stack.sh'" .Hostname) }}
+  - {{message . (printf "    ccloudvm copy %s local.conf /home/stack/devstack/local.conf" .Hostname) }}
+  - {{message . (printf "    ccloudvm connect %s" .Hostname) }}
+  - {{message . "    sudo su -c 'cd devstack && ./stack.sh' -l stack" }}
   - {{message . "" }}
 {{with .HostIP}}
   - {{message $ (printf "To access horizon point your host's browser at http://%s:55580/dashboard" . ) }}
