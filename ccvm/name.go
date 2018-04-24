@@ -108,8 +108,7 @@ func init() {
 	}
 	for i := 0; i < len(nameGenerator.indicies); i++ {
 		r1 := nameGenerator.rand.Int() % len(nameGenerator.indicies)
-		r2 := nameGenerator.rand.Int() % len(nameGenerator.indicies)
-		nameGenerator.indicies[r1], nameGenerator.indicies[r2] = nameGenerator.indicies[r2], nameGenerator.indicies[r1]
+		nameGenerator.indicies[r1], nameGenerator.indicies[i] = nameGenerator.indicies[i], nameGenerator.indicies[r1]
 	}
 }
 
