@@ -179,7 +179,9 @@ func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string, t
 		return wkld, nil
 	}
 
-	p, err := build.Default.Import(ccloudvmPkg, "", build.FindOnly)
+	bld := build.Default
+	bld.GOPATH = ws.GoPath
+	p, err := bld.Import(ccloudvmPkg, "", build.FindOnly)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to locate ccloudvm workload directory")
 	}
