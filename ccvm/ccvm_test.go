@@ -24,7 +24,9 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -125,6 +127,15 @@ func setProxies(args *types.CreateArgs) error {
 	return nil
 }
 
+func setGoPath(args *types.CreateArgs) error {
+	goPathBytes, err := exec.Command("go", "env", "GOPATH").Output()
+	if err != nil {
+		return errors.Wrap(err, "Unable to determine GOPATH")
+	}
+	args.GoPath = strings.TrimSpace(string(goPathBytes))
+	return nil
+}
+
 func createDownloader() (*downloader, error) {
 	d := &downloader{}
 	home := os.Getenv("HOME")
@@ -188,6 +199,11 @@ func TestSystem(t *testing.T) {
 	err := setProxies(createArgs)
 	if err != nil {
 		t.Fatalf("Unable to set proxies: %v", err)
+	}
+
+	err = setGoPath(createArgs)
+	if err != nil {
+		t.Fatalf("Unable to set GOPath: %v", err)
 	}
 
 	resultCh := make(chan interface{})
