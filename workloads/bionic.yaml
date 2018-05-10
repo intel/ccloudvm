@@ -1,6 +1,6 @@
 ---
 base_image_url: https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img
-base_image_name: Ubuntu 18.10
+base_image_name: Ubuntu 18.04
 vm:
   disk_gib: 16
 ...
