@@ -525,7 +525,7 @@ func (s *ccvmService) processAction(action interface{}) {
 		}
 		delete(s.transactions, int(a))
 		if len(s.transactions) == 0 {
-			if s.shutdownTimer == nil {
+			if s.shutdownTimer == nil && systemd {
 				shutdownIn := time.Minute
 				s.shutdownTimer = time.NewTimer(shutdownIn)
 				s.cases[TimeChIndex].Chan = reflect.ValueOf(s.shutdownTimer.C)
