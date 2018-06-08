@@ -1,7 +1,6 @@
 ---
-base_image_url: https://download.fedoraproject.org/pub/fedora/linux/releases/25/CloudImages/x86_64/images/Fedora-Cloud-Base-25-1.3.x86_64.qcow2
-base_image_name: Fedora 25
-hostname: singlevm
+base_image_url: https://download.fedoraproject.org/pub/fedora/linux/releases/28/Cloud/x86_64/images/Fedora-Cloud-Base-28-1.1.x86_64.qcow2
+base_image_name: Fedora 28
 vm:
   disk_gib: 16
 ...
@@ -53,6 +52,8 @@ runcmd:
 
 users:
   - name: {{.User}}
+    uid: "{{.UID}}"
+    gid: "{{.GID}}"
     gecos: CC Demo User
     lock-passwd: true
     shell: /bin/bash
