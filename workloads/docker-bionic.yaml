@@ -1,0 +1,69 @@
+---
+inherits: bionic
+...
+---
+{{- define "ENV" -}}
+{{proxyVars .}}
+{{- print " DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true " -}}
+{{end}}
+
+write_files:
+{{- if len $.HTTPProxy }}
+ - content: |
+     [Service]
+     Environment="HTTP_PROXY={{$.HTTPProxy}}"{{if len .HTTPSProxy}} "HTTPS_PROXY={{.HTTPSProxy}}{{end}}"{{if len .NoProxy}} "NO_PROXY={{.NoProxy}},{{.Hostname}}{{end}}"
+   path: /etc/systemd/system/docker.service.d/http-proxy.conf
+{{- end}}
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+
+runcmd:
+ - {{beginTask . "Add docker GPG key" }}
+ - {{template "ENV" .}}curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+ - {{endTaskCheck .}}
+
+ - {{beginTask . "Adding docker repo"}}
+ - {{template "ENV" .}} sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+ - {{endTaskCheck .}}
+
+ - {{beginTask . "Retrieving updated list of packages"}}
+ - {{template "ENV" .}}sudo apt-get update
+ - {{endTaskCheck .}}
+
+ - {{beginTask . "Install docker-ce"}}
+ - sudo apt-get install -y docker-ce
+ - {{endTaskCheck .}}
+
+ - {{beginTask . (printf "Adding user %s to the docker group" .User)}}
+ - sudo gpasswd -a {{.User}} docker
+ - {{endTaskCheck .}}
+
+{{- if len $.HTTPProxy }}
+ - {{beginTask . "Configuring docker proxies" }}
+ - mkdir /home/{{.User}}/.docker
+ - echo "{" >> /home/{{.User}}/.docker/config.json
+ - echo "  \"proxies\":" >> /home/{{.User}}/.docker/config.json
+ - echo "  {" >> /home/{{.User}}/.docker/config.json
+ - echo "    \"default\":" >> /home/{{.User}}/.docker/config.json
+ - echo "    {" >> /home/{{.User}}/.docker/config.json
+ - echo "      \"httpProxy\":\"{{.HTTPProxy}}\"," >> /home/{{.User}}/.docker/config.json
+ - echo "      \"httpsProxy\":\"{{.HTTPSProxy}}\"," >> /home/{{.User}}/.docker/config.json
+ - echo "      \"noProxy\":\"{{.NoProxy}}\"" >> /home/{{.User}}/.docker/config.json
+ - echo "    }" >> /home/{{.User}}/.docker/config.json
+ - echo "  }" >> /home/{{.User}}/.docker/config.json
+ - echo "}" >> /home/{{.User}}/.docker/config.json
+ - chown {{.User}}:{{.User}} -R /home/{{.User}}/.docker
+ - {{endTaskCheck .}}
+{{end}}
+
+# Below is a temporary hack to make sure docker containers and the host have networking after installing docker.
+# https://github.com/docker/libnetwork/issues/2187
+ - {{beginTask . "Fixing resolv.conf to counter current bionic networking issue with docker"}}
+ - sudo rm /etc/resolv.conf
+ - sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+ - {{endTaskCheck .}}
+...

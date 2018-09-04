@@ -9,14 +9,9 @@ vm:
 {{proxyVars .}}
 {{- print " DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true " -}}
 {{end}}
+
 #cloud-config
 write_files:
-{{- if len $.HTTPProxy }}
- - content: |
-     [Service]
-     Environment="HTTP_PROXY={{$.HTTPProxy}}"{{if len .HTTPSProxy}} "HTTPS_PROXY={{.HTTPSProxy}}{{end}}"{{if len .NoProxy}} "NO_PROXY={{.NoProxy}},{{.Hostname}}{{end}}"
-   path: /etc/systemd/system/docker.service.d/http-proxy.conf
-{{- end}}
 {{with proxyEnv . 5}}
  - content: |
 {{.}}
