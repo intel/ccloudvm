@@ -505,7 +505,7 @@ func (s *ccvmService) processAction(action interface{}) {
 		s.counter++
 		a.action(ctx, s, resultCh)
 	case cancelAction:
-		fmt.Fprintf(os.Stderr, "Cancelling %d\n", int(a))
+		fmt.Fprintf(os.Stderr, "Cancelling %d\n", int(a)) //nolint: errcheck
 		t, ok := s.transactions[int(a)]
 		if ok {
 			t.cancel()
@@ -727,7 +727,7 @@ func main() {
 	err := startServer(signalCh)
 	fmt.Println("Quiting")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err) //nolint: errcheck
 		os.Exit(1)
 	}
 }
