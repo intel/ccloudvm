@@ -424,16 +424,16 @@ func statusVM(ctx context.Context, details *types.InstanceDetails) {
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 0, '\t', 0)
-	fmt.Fprintf(w, "Name\t:\t%s\n", details.Name)
-	fmt.Fprintf(w, "HostIP\t:\t%s\n", details.VMSpec.HostIP)
-	fmt.Fprintf(w, "Workload\t:\t%s\n", details.Workload)
-	fmt.Fprintf(w, "Status\t:\t%s\n", status)
-	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)
-	fmt.Fprintf(w, "VCPUs\t:\t%d\n", details.VMSpec.CPUs)
-	fmt.Fprintf(w, "Mem\t:\t%d MiB\n", details.VMSpec.MemMiB)
-	fmt.Fprintf(w, "Disk\t:\t%d GiB\n", details.VMSpec.DiskGiB)
+	fmt.Fprintf(w, "Name\t:\t%s\n", details.Name)               //nolint: errcheck
+	fmt.Fprintf(w, "HostIP\t:\t%s\n", details.VMSpec.HostIP)    //nolint: errcheck
+	fmt.Fprintf(w, "Workload\t:\t%s\n", details.Workload)       //nolint: errcheck
+	fmt.Fprintf(w, "Status\t:\t%s\n", status)                   //nolint: errcheck
+	fmt.Fprintf(w, "SSH\t:\t%s\n", ssh)                         //nolint: errcheck
+	fmt.Fprintf(w, "VCPUs\t:\t%d\n", details.VMSpec.CPUs)       //nolint: errcheck
+	fmt.Fprintf(w, "Mem\t:\t%d MiB\n", details.VMSpec.MemMiB)   //nolint: errcheck
+	fmt.Fprintf(w, "Disk\t:\t%d GiB\n", details.VMSpec.DiskGiB) //nolint: errcheck
 	if details.VMSpec.Qemuport != 0 {
-		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", details.VMSpec.Qemuport)
+		fmt.Fprintf(w, "QEMU Debug Port\t:\t%d\n", details.VMSpec.Qemuport) //nolint: errcheck
 	}
 	_ = w.Flush()
 }
@@ -618,9 +618,9 @@ func Instances(ctx context.Context) error {
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 1, '\t', 0)
-	fmt.Fprintln(w, "Name\tHostIP\tWorkload\tVCPUs\tMem\tDisk\t")
+	fmt.Fprintln(w, "Name\tHostIP\tWorkload\tVCPUs\tMem\tDisk\t") //nolint: errcheck
 	for _, id := range instanceDetails {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d MiB\t%d Gib\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d MiB\t%d Gib\n", //nolint: errcheck
 			id.Name, id.VMSpec.HostIP, id.Workload,
 			id.VMSpec.CPUs, id.VMSpec.MemMiB, id.VMSpec.DiskGiB)
 	}
