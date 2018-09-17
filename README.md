@@ -765,3 +765,23 @@ Removing ccloudvm service
 ```
 
 Once you run ccloudvm teardown, ccloudvm will be unusable until you run ccloudvm setup.
+
+## Misc
+
+### bash completion
+The script that might help with auto completion is located
+[here](./scripts/ccloudvm_bashcomplete). This can be either placed at
+`/etc/bash_completion.d/` of your machine or as described below.
+
+Note: you will need to start a new shell to be able to make use of auto
+completion.
+
+```
+$ mkdir ~/.bash_completion.d
+$ cp scripts/ccloudvm_bashcomplete ~/.bash_completion.d/ccloudvm
+$ cat << \EOF > ~/.bash_completion
+for file in ~/.bash_completion.d/*; do
+  [ -f "${file}" ] && . ${file}
+done
+EOF
+```

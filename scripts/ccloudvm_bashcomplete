@@ -1,0 +1,23 @@
+_ccloudvm()
+{
+  local cur prev opts
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+  opts="connect copy create delete help instances quit run setup start status stop teardown"
+
+  case "${prev}" in
+    connect|delete|quit|run|start|status|stop)
+      local running=$(for x in `ccloudvm instances | grep -v ^Name | awk '{print $1}'`;do echo $x; done)
+      COMPREPLY=($(compgen -W "${running}" -- ${cur}))
+      return 0
+      ;;
+    *)
+    ;;
+  esac
+
+    COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
+    return 0
+
+}
+complete -F _ccloudvm ccloudvm
