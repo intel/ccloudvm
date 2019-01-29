@@ -110,7 +110,7 @@ func bootVM(ctx context.Context, ws *workspace, name string, in *types.VMSpec) e
 			"-device", "isa-serial,chardev=ccld0")
 	}
 
-	args = append(args, "-display", "none", "-vga", "none")
+	args = append(args, "-display", "none", "-vga", "virtio")
 
 	output, err := qemu.LaunchCustomQemu(ctx, "", args, nil, nil, nil)
 	if err != nil {
