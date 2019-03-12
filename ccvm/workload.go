@@ -44,7 +44,7 @@ const ccloudvmPkg = "github.com/intel/ccloudvm"
 var indentedRegexp *regexp.Regexp
 
 func init() {
-	indentedRegexp = regexp.MustCompile("\\s+.*")
+	indentedRegexp = regexp.MustCompile(`\s+.*`)
 }
 
 type workload struct {

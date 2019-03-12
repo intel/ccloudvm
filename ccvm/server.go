@@ -50,7 +50,7 @@ var hostnameRegexp *regexp.Regexp
 
 func init() {
 	flag.BoolVar(&systemd, "systemd", true, "Use systemd socket activation if true")
-	hostnameRegexp = regexp.MustCompile("^[A-Za-z0-9\\-]+$")
+	hostnameRegexp = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 }
 
 type service interface {
@@ -239,7 +239,7 @@ func (s *ccvmService) findFreeIP() (net.IP, uint32, error) {
 func (s *ccvmService) findExistingInstances() {
 	instancesDir := filepath.Join(s.ccvmDir, "instances")
 
-	_ = filepath.Walk(instancesDir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(instancesDir, func(path string, info os.FileInfo, ferr error) error {
 		if path == instancesDir {
 			return nil
 		}
@@ -496,7 +496,7 @@ func (s *ccvmService) processAction(action interface{}) {
 		}
 		if s.shutdownTimer != nil {
 			if !s.shutdownTimer.Stop() {
-				_ = <-s.shutdownTimer.C
+				<-s.shutdownTimer.C
 			}
 			s.shutdownTimer = nil
 			s.cases[TimeChIndex].Chan = reflect.ValueOf(nil)
@@ -563,7 +563,7 @@ DONE:
 			fmt.Printf("Signal received active transactions = %d\n", len(s.transactions))
 			if s.shutdownTimer != nil {
 				if !s.shutdownTimer.Stop() {
-					_ = <-s.shutdownTimer.C
+					<-s.shutdownTimer.C
 				}
 			}
 			for _, t := range s.transactions {

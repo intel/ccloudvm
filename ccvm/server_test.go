@@ -500,7 +500,7 @@ func TestServerShutdownPending(t *testing.T) {
 		transCh: transCh,
 	}
 
-	_ = <-transCh
+	<-transCh
 
 	close(doneCh)
 	wg.Wait()

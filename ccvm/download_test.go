@@ -180,7 +180,7 @@ func testDownloadCancelOneOfTwo(ctx context.Context, t *testing.T, downloadCh ch
 
 	cancel()
 	ret1 := <-params[0].ch
-	_ = <-params[1].ch
+	<-params[1].ch
 
 	if ret1.err != nil {
 		t.Errorf("Download failed : %v", ret1.err)
