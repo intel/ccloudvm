@@ -1,0 +1,8 @@
+linters:
+  enable:
+    - gofmt
+    - gocyclo
+    - misspell
+linters-settings:
+  gocyclo:
+    min-complexity: 15

@@ -67,35 +67,6 @@ func defaultWorkload() *workload {
 	}
 }
 
-func unmarshal(in *types.VMSpec, data []byte) error {
-	err := yaml.Unmarshal(data, in)
-	if err != nil {
-		return errors.Wrap(err, "Unable to unmarshal instance state")
-	}
-
-	for i := range in.Mounts {
-		if err := types.CheckDirectory(in.Mounts[i].Path); err != nil {
-			return fmt.Errorf("Bad mount %s specified: %v",
-				in.Mounts[i].Path, err)
-		}
-	}
-
-	return nil
-}
-
-func unmarshalWithTemplate(in *types.VMSpec, ws *workspace, data string) error {
-	tmpl, err := template.New("instance-data").Parse(string(data))
-	if err != nil {
-		return errors.Wrap(err, "Unable to parse instance data template")
-	}
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, ws)
-	if err != nil {
-		return errors.Wrap(err, "Unable to execute instance data template")
-	}
-	return unmarshal(in, buf.Bytes())
-}
-
 func (ins *workloadSpec) unmarshal(data []byte) error {
 	err := yaml.Unmarshal(data, ins)
 	if err != nil {

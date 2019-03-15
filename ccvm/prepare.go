@@ -303,7 +303,7 @@ func buildISOImage(ctx context.Context, resultCh chan interface{}, userData []by
 			Line: string(userData),
 		}
 		resultCh <- types.CreateResult{
-			Line: string(mdBuf.Bytes()),
+			Line: mdBuf.String(),
 		}
 	}
 
