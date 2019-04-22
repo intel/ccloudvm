@@ -35,7 +35,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/ciao-project/ciao/osprepare"
+	"github.com/intel/ccloudvm/osprepare"
 	"github.com/intel/ccloudvm/types"
 	"github.com/pkg/errors"
 )
@@ -55,11 +55,11 @@ func (l logger) Infof(s string, args ...interface{}) {
 }
 
 func (l logger) Warningf(s string, args ...interface{}) {
-	l.Infof(s, args)
+	l.Infof(s, args...)
 }
 
 func (l logger) Errorf(s string, args ...interface{}) {
-	l.Infof(s, args)
+	l.Infof(s, args...)
 }
 
 const systemdService = `

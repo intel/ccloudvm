@@ -148,7 +148,7 @@ func InstallDeps(ctx context.Context, reqs PackageRequirements, logger clogger.C
 	}
 	if reqPkgs := collectPackages(distro, reqs); reqPkgs != nil {
 		logger.Infof("Missing packages detected: %v", reqPkgs)
-		if distro.InstallPackages(ctx, reqPkgs, logger) == false {
+		if !distro.InstallPackages(ctx, reqPkgs, logger) {
 			logger.Errorf("Failed to install: %s", strings.Join(reqPkgs, ", "))
 			return
 		}

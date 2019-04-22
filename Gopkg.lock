@@ -2,65 +2,83 @@
 
 
 [[projects]]
+  digest = "1:469d0d0ba7bd8b13b142b4d24047c3a2da6275b07b1d9fd3de57235482c1bf09"
   name = "github.com/ciao-project/ciao"
   packages = [
     "clogger",
     "deviceinfo",
-    "osprepare",
-    "uuid"
+    "uuid",
   ]
+  pruneopts = ""
   revision = "194264adc5835bca8bb6fa70cf61330a8ed64764"
 
 [[projects]]
+  digest = "1:5fc6db95056f027c33df38134f69c4d11c668c97dd1fc868d0b8512f76825462"
   name = "github.com/coreos/go-systemd"
   packages = ["activation"]
+  pruneopts = ""
   revision = "d2196463941895ee908e13531a23a39feb9e1243"
   version = "v15"
 
 [[projects]]
+  digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
   name = "github.com/inconshreveable/mousetrap"
   packages = ["."]
+  pruneopts = ""
   revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
   version = "v1.0"
 
 [[projects]]
   branch = "master"
+  digest = "1:bdc9d2b05a7e225d7a73da6881a8e2fa4a61724e9925aa17d2ac3bf66de81336"
   name = "github.com/intel/govmm"
   packages = ["qemu"]
+  pruneopts = ""
   revision = "22c99930c2f69fff02926e90803e4a7168d08240"
 
 [[projects]]
+  digest = "1:7365acd48986e205ccb8652cc746f09c8b7876030d53710ea6ef7d0bd0dcd7ca"
   name = "github.com/pkg/errors"
   packages = ["."]
+  pruneopts = ""
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
 
 [[projects]]
+  digest = "1:256484dbbcd271f9ecebc6795b2df8cad4c458dd0f5fd82a8c2fa0c29f233411"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
+  pruneopts = ""
   revision = ""
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:ea4f0a245ffd5560fa7afbe0c9536f8b0ade0cbe1bb49927465427cb29cb3dc0"
   name = "github.com/spf13/cobra"
   packages = ["."]
+  pruneopts = ""
   revision = "b95ab734e27d33e0d8fbabf71ca990568d4e2020"
 
 [[projects]]
+  digest = "1:261bc565833ef4f02121450d74eb88d5ae4bd74bfe5d0e862cddb8550ec35000"
   name = "github.com/spf13/pflag"
   packages = ["."]
+  pruneopts = ""
   revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:5a8ac14f14b3266c21a895b9f84147af1727e2057748aa692f0c7978997552b1"
   name = "golang.org/x/net"
   packages = [
     "http/httpproxy",
-    "idna"
+    "idna",
   ]
+  pruneopts = ""
   revision = "309822c5b9b9f80db67f016069a12628d94fad34"
 
 [[projects]]
   branch = "master"
+  digest = "1:9f9562b058a594dae0c8e2388c1a802664111736845bc08885246f0e4bf99bdd"
   name = "golang.org/x/text"
   packages = [
     "collate",
@@ -76,19 +94,33 @@
     "unicode/bidi",
     "unicode/cldr",
     "unicode/norm",
-    "unicode/rangetable"
+    "unicode/rangetable",
   ]
+  pruneopts = ""
   revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
   branch = "v2"
+  digest = "1:cd78af685c4c12af0f2e9526f504ab3b18ef06130b325729e096dfe5a807ea86"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
+  pruneopts = ""
   revision = "1244d3ce02e3e1c16820ada0bae506b6c479f106"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4d1162080f54f2f0cda47fc8e75d598892ed339710daf718a9e7b2bf002b7eaf"
+  input-imports = [
+    "github.com/ciao-project/ciao/clogger",
+    "github.com/ciao-project/ciao/deviceinfo",
+    "github.com/ciao-project/ciao/uuid",
+    "github.com/coreos/go-systemd/activation",
+    "github.com/intel/govmm/qemu",
+    "github.com/pkg/errors",
+    "github.com/pmezard/go-difflib/difflib",
+    "github.com/spf13/cobra",
+    "golang.org/x/net/http/httpproxy",
+    "gopkg.in/yaml.v2",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
