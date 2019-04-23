@@ -16,7 +16,7 @@
 
 package client
 
-import "github.com/ciao-project/ciao/osprepare"
+import "github.com/intel/ccloudvm/osprepare"
 
 var ccloudvmClearDeps = []osprepare.PackageRequirement{
 	{BinaryName: "/usr/bin/unxz", PackageName: "os-core-update"},

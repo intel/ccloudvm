@@ -6,7 +6,7 @@ go:
     - tip
 
 env:
-  - GOLANGCILINT=$(curl -fsSLI -o /dev/null -w %{url_effective} https://github.com/golangci/golangci-lint/releases/latest | awk -F '/' '{print $8}')
+  - GOLANGCILINT="v1.16.0"
 
 go_import_path: github.com/intel/ccloudvm
 
