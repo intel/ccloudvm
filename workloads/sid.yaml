@@ -1,6 +1,6 @@
 ---
-base_image_url: https://cloud.debian.org/images/cloud/buster/20201214-484/debian-10-genericcloud-amd64-20201214-484.qcow2
-base_image_name: Debian Buster
+base_image_url: https://cloud.debian.org/images/cloud/sid/daily/20210109-510/debian-sid-genericcloud-amd64-daily-20210109-510.qcow2
+base_image_name: Debian Sid
 vm:
   disk_gib: 16
 ...

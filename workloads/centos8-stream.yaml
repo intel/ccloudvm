@@ -1,35 +1,39 @@
 ---
-base_image_url: https://cloud.debian.org/images/cloud/buster/20201214-484/debian-10-genericcloud-amd64-20201214-484.qcow2
-base_image_name: Debian Buster
+base_image_url: https://cloud.centos.org/centos/8-stream/x86_64/images/CentOS-Stream-GenericCloud-8-20201217.0.x86_64.qcow2
+base_image_name: Centos 8
 vm:
   disk_gib: 16
 ...
 ---
-{{- define "ENV" -}}
-{{proxyVars .}}
-{{- print " DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true " -}}
-{{end}}
-
 #cloud-config
 write_files:
+{{- if len $.HTTPProxy }}
+ - content: |
+     [Service]
+     Environment="HTTP_PROXY={{$.HTTPProxy}}"{{if len .HTTPSProxy}} "HTTPS_PROXY={{.HTTPSProxy}}{{end}}"{{if len .NoProxy}} "NO_PROXY={{.NoProxy}},{{.Hostname}}{{end}}"
+   path: /etc/systemd/system/docker.service.d/http-proxy.conf
+{{- end}}
 {{with proxyEnv . 5}}
  - content: |
 {{.}}
    path: /etc/environment
-{{end}}
+{{end -}}
 
-apt:
+yum:
 {{- if len $.HTTPProxy }}
   proxy: "{{$.HTTPProxy}}"
 {{- end}}
 {{- if len $.HTTPSProxy }}
   https_proxy: "{{$.HTTPSProxy}}"
 {{- end}}
+
 package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
 
 runcmd:
  - {{beginTask . "Booting VM"}}
  - {{endTaskOk . }}
+
+ - hostnamectl set-hostname {{.Hostname}}
 
  - {{beginTask . (printf "Adding %s to /etc/hosts" .Hostname) }}
  - echo "127.0.0.1 {{.Hostname}}" >> /etc/hosts
@@ -46,13 +50,11 @@ runcmd:
  - {{endTaskCheck $}}
 {{end}}
 
-
-
 users:
   - name: {{.User}}
     uid: "{{.UID}}"
     gid: "{{.GID}}"
-    gecos: CIAO Demo User
+    gecos: CC Demo User
     lock-passwd: true
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
