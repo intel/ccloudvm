@@ -1,0 +1,41 @@
+# github.com/ciao-project/ciao v0.0.0-20180108144400-194264adc583
+## explicit
+github.com/ciao-project/ciao/clogger
+github.com/ciao-project/ciao/deviceinfo
+github.com/ciao-project/ciao/uuid
+# github.com/coreos/go-systemd v0.0.0-20170731111925-d21964639418
+## explicit
+github.com/coreos/go-systemd/activation
+# github.com/inconshreveable/mousetrap v1.0.0
+## explicit
+github.com/inconshreveable/mousetrap
+# github.com/intel/govmm v0.0.0-20180104200030-22c99930c2f6
+## explicit
+github.com/intel/govmm/qemu
+# github.com/pkg/errors v0.8.0
+## explicit
+github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+## explicit
+github.com/pmezard/go-difflib/difflib
+# github.com/spf13/cobra v0.0.2-0.20171231101556-b95ab734e27d
+## explicit
+github.com/spf13/cobra
+# github.com/spf13/pflag v1.0.0
+## explicit
+github.com/spf13/pflag
+# golang.org/x/net v0.0.0-20180201030042-309822c5b9b9
+## explicit
+golang.org/x/net/http/httpproxy
+golang.org/x/net/idna
+# golang.org/x/text v0.3.1-0.20171227012246-e19ae1496984
+## explicit
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+# gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+## explicit
+# gopkg.in/yaml.v2 v2.0.0-20180108131554-1244d3ce02e3
+## explicit
+gopkg.in/yaml.v2
