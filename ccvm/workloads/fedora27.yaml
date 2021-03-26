@@ -1,5 +1,5 @@
 ---
-base_image_url: https://download.fedoraproject.org/pub/fedora/linux/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2
+base_image_url: https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2
 base_image_name: Fedora 27
 vm:
   disk_gib: 16
