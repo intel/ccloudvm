@@ -12,6 +12,8 @@ github.com/inconshreveable/mousetrap
 # github.com/intel/govmm v0.0.0-20180104200030-22c99930c2f6
 ## explicit
 github.com/intel/govmm/qemu
+# github.com/mattn/goveralls v0.0.8
+## explicit
 # github.com/pkg/errors v0.8.0
 ## explicit
 github.com/pkg/errors
@@ -24,7 +26,7 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.0
 ## explicit
 github.com/spf13/pflag
-# golang.org/x/net v0.0.0-20180201030042-309822c5b9b9
+# golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 ## explicit
 golang.org/x/net/http/httpproxy
 golang.org/x/net/idna

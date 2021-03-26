@@ -20,9 +20,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
-	"go/build"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -40,6 +41,10 @@ import (
 )
 
 const ccloudvmPkg = "github.com/intel/ccloudvm"
+
+//go:embed "workloads/*"
+var wkldfs embed.FS
+var allwklds, _ = fs.ReadDir(wkldfs, "workloads")
 
 var indentedRegexp *regexp.Regexp
 
@@ -179,19 +184,16 @@ func loadWorkloadData(ctx context.Context, ws *workspace, workloadName string, t
 		return wkld, nil
 	}
 
-	bld := build.Default
-	bld.GOPATH = ws.GoPath
-	p, err := bld.Import(ccloudvmPkg, "", build.FindOnly)
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to locate ccloudvm workload directory")
+	for _, wkldfile := range allwklds {
+		if wkldfile.Name() == fmt.Sprintf("%s.yaml", workloadName) {
+			wkld, err := wkldfs.ReadFile(fmt.Sprintf("workloads/%s.yaml", workloadName))
+			if err != nil {
+				return nil, errors.Wrap(err, "unable to read workload file")
+			}
+			return wkld, nil
+		}
 	}
-	workloadPath := filepath.Join(p.Dir, "workloads", fmt.Sprintf("%s.yaml", workloadName))
-	wkld, err = ioutil.ReadFile(workloadPath)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to load workload %s", workloadPath)
-	}
-
-	return wkld, nil
+	return nil, errors.New("Unable to find the workload anywhere")
 }
 
 func unmarshalWorkload(ws *workspace, wkld *workload, spec,

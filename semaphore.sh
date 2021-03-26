@@ -25,6 +25,16 @@ function finish {
 	echo "=          FAILURE           ="
     fi
     echo "=============================="
+
+    rm -rf ${TEMPDIR}
+}
+
+function get_latest_go {
+  GO_URL=$(curl -s https://golang.org/dl/#stable | grep 'linux-amd64' | grep downloadBox | awk -F '"' '{print $4}')
+  TEMPDIR=$(mktemp -d)
+  curl -L https://golang.org/${GO_URL} --output -| tar -C ${TEMPDIR} -xzf -
+  export GOROOT=${TEMPDIR}/go
+  export PATH=${TEMPDIR}/go/bin:$PATH
 }
 
 trap finish EXIT
@@ -33,6 +43,11 @@ created=0
 
 if [[ ! -z "${SEMAPHORE_REPO_SLUG}" ]]
 then
+    echo ""
+    echo "===== Download stable go ====="
+    echo ""
+    get_latest_go
+
     echo ""
     echo "===== Cloning repo ====="
     echo ""
@@ -205,6 +220,8 @@ fi
 
 if [ "$SEMAPHORE_REPO_SLUG" = "intel/ccloudvm" ]
 then
+    which go
+    echo ${GOROOT}
     go get github.com/mattn/goveralls
     $GOPATH/bin/goveralls --race -v -service=semaphore --package github.com/intel/ccloudvm/ccvm
 else
