@@ -309,7 +309,7 @@ func (c ccvmBackend) createInstance(ctx context.Context, resultCh chan interface
 	}
 
 	resultCh <- types.CreateResult{
-		Line: fmt.Sprintf("VM successfully created!\n"),
+		Line: "VM successfully created!\n",
 	}
 
 	return nil

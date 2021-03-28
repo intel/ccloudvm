@@ -1,12 +1,11 @@
 language: go
 
 go:
-    - "1.11"
-    - "1.12"
+    - "1.16"
     - tip
 
 env:
-  - GOLANGCILINT="v1.16.0"
+  - GOLANGCILINT="v1.39.0"
 
 go_import_path: github.com/intel/ccloudvm
 

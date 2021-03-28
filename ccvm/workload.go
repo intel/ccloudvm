@@ -31,7 +31,6 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"text/template"
 	"time"
 
@@ -40,16 +39,11 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-const ccloudvmPkg = "github.com/intel/ccloudvm"
-
 //go:embed "workloads/*"
 var wkldfs embed.FS
 var allwklds, _ = fs.ReadDir(wkldfs, "workloads")
 
-var indentedRegexp *regexp.Regexp
-
 func init() {
-	indentedRegexp = regexp.MustCompile(`\s+.*`)
 }
 
 type workload struct {
