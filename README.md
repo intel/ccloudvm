@@ -17,7 +17,7 @@ pre-shipped or user supplied annotated cloud-init files.
 
 All you need to have installed on your machine is:
 
-- Go 1.9 or greater.
+- Go 1.16 or greater.
 
 The installation instructions for the latest version of Go can be
 found [here](https://golang.org/doc/install).  Once installed, ensure
@@ -119,12 +119,14 @@ can specify:
   to run on the first boot of the VM.  This file is used to create
   user accounts, install packages and configure the VM.
 
-ccloudvm ships with a number of workloads for creating VMs based on standard images,
-such as Ubuntu 16.04 and Fedora 25.  Users are also free to create their own workloads.
-Standard workloads are stored in $GOPATH/src/github.com/intel/ccloudvm/workloads.
-User created workloads are stored in ~/.ccloudvm/workloads.  ccloudvm always checks the
-~/.ccloudvm/workloads directory first so if a workload exists in both directories
-with the same name, ccloudvm will use the workload in ~/.ccloudvm/workloads.
+ccloudvm ships with a number of workloads for creating VMs based on standard
+images, such as Ubuntu 16.04 and Fedora 25.  Users are also free to create
+their own workloads.  Standard workloads defined at
+$GOPATH/src/github.com/intel/ccloudvm/workloads are stored in the ccvm binary
+as data files.  User created workloads are stored in ~/.ccloudvm/workloads.
+ccloudvm always checks the ~/.ccloudvm/workloads directory first so if a
+workload exists in both directories with the same name, ccloudvm will use the
+workload in ~/.ccloudvm/workloads.
 
 When creating a new instance via the create command the user must specify a workload.
 This can be done by providing the name of a workload, present in one of the two directories
