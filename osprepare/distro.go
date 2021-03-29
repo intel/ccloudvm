@@ -67,6 +67,8 @@ func getDistro() distro {
 		return &debianDistro{}
 	} else if strings.Contains(osRelease.ID, "fedora") {
 		return &fedoraDistro{}
+	} else if strings.Contains(osRelease.ID, "arch") {
+		return &archDistro{}
 	}
 	return nil
 }
@@ -160,4 +162,15 @@ func (d *fedoraDistro) getID() string {
 // Use dnf to install on Fedora
 func (d *fedoraDistro) InstallPackages(ctx context.Context, packages []string, logger clogger.CiaoLog) bool {
 	return sudoFormatCommand(ctx, "dnf install -y %s", packages, logger)
+}
+
+type archDistro struct {
+}
+
+func (d *archDistro) getID() string {
+	return "arch"
+}
+
+func (d *archDistro) InstallPackages(ctx context.Context, packages []string, logger clogger.CiaoLog) bool {
+	return sudoFormatCommand(ctx, "pacman -Sy --noconfirm %s", packages, logger)
 }
