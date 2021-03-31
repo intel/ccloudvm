@@ -1,0 +1,24 @@
+---
+base_image_url: https://download.clearlinux.org/releases/20910/clear/clear-20910-cloud.img.xz
+base_image_name: Clear 20910
+bios: https://download.clearlinux.org/image/OVMF.fd
+needs_nested_vm: true
+vm:
+  disk_gib: 16
+...
+---
+#cloud-config
+package_upgrade: {{with .PackageUpgrade}}{{.}}{{else}}false{{end}}
+packages:
+ - curl
+
+users:
+  - name: {{.User}}
+    uid: "{{.UID}}"
+    gid: "{{.GID}}"
+    lock-passwd: false
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh-authorized-keys:
+    - {{.PublicKey}}
+...
